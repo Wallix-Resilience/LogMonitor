@@ -1,0 +1,108 @@
+--- glusterfs-3.3.0/rpc/rpc-transport/socket/src/name.c	2012-05-30 19:53:23.000000000 +0200
++++ glusterfs-3.3.0/rpc/rpc-transport/socket/src/name2.c	2012-06-15 18:08:30.366155038 +0200
+@@ -42,14 +42,79 @@
+ {
+         int32_t ret = -1;
+         /*  struct sockaddr_in sin = {0, }; */
+-        uint16_t port = ceiling - 1;
+-
+-        while (port)
++        uint16_t port = ceiling + 1;
++	socklen_t addr_len = 0;
++        while (port < 65535)
+         {
+                 switch (sockaddr->sa_family)
+                 {
+                 case AF_INET6:
+                         ((struct sockaddr_in6 *)sockaddr)->sin6_port = htons (port);
++
++						/*************** Added by Lahoucine BENLAHMR ********************/
++						struct addrinfo hints, *res = 0, *rp = NULL;
++						data_t *listen_host_data = NULL; 
++						char service[NI_MAXSERV], *listen_host = NULL;
++				
++					        
++						xlator_t *this = NULL;
++						this = THIS;
++						
++				   
++				
++				        listen_host_data = dict_get (this->options, "transport.socket.bind-address");	
++				
++				        if (listen_host_data)
++				        {
++				                listen_host = data_to_str (listen_host_data);
++						gf_log (this->name, GF_LOG_TRACE,
++							"LISTENNNNNINNNG IPIPIP:  %s.",
++							listen_host);
++
++				         
++						
++					memset (service, 0, sizeof (service));
++						
++				        sprintf (service, "%d", port);
++				
++				        memset (&hints, 0, sizeof (hints));
++				        hints.ai_family = sockaddr->sa_family;
++				        hints.ai_socktype = SOCK_STREAM;
++				        hints.ai_flags    = AI_PASSIVE | AI_ADDRCONFIG;
++				
++				        ret = getaddrinfo(listen_host, service, &hints, &res);
++				        if (ret != 0) {
++				                gf_log (this->name, GF_LOG_ERROR,
++				                        "getaddrinfo failed for host %s, service %s (%s)",
++				                        listen_host, service, gai_strerror (ret));
++				                ret = -1;
++				                break;
++				        }
++				        /* IPV6 server can handle both ipv4 and ipv6 clients */
++				        for (rp = res; rp != NULL; rp = rp->ai_next) {
++				                if (rp->ai_addr == NULL)
++				                        continue;
++				                if (rp->ai_family == AF_INET6) {
++				                        memcpy (sockaddr, rp->ai_addr, rp->ai_addrlen);
++							addr_len = rp->ai_addrlen;
++				                }
++				        }
++				
++				        //if (!(*addr_len)) {
++				        //        memcpy (sockaddr, res->ai_addr, res->ai_addrlen);
++					// }
++				
++						char str[INET6_ADDRSTRLEN];
++					
++						// now get it back and print it
++						inet_ntop(AF_INET6, &(((struct sockaddr_in6 *)sockaddr)->sin6_addr), str, INET6_ADDRSTRLEN);
++						
++						printf("%s\n", str); 
++				
++				
++				        freeaddrinfo (res);
++					}			        
++						/******************************************************************/
+                         break;
+ 
+                 case AF_INET_SDP:
+@@ -58,7 +123,12 @@
+                         break;
+                 }
+ 
+-                ret = bind (fd, sockaddr, sockaddr_len);
++                ret = bind (fd, sockaddr, sizeof(struct sockaddr_in6));
++		
++		//	if(ret == -1){
++		  // printf ("Code de l'erreur : %d\n", errno);  
++		  //perror("Erreur");  
++		//}
+ 
+                 if (ret == 0)
+                         break;
+@@ -66,7 +136,7 @@
+                 if (ret == -1 && errno == EACCES)
+                         break;
+ 
+-                port--;
++                port++;
+         }
+ 
+         return ret;

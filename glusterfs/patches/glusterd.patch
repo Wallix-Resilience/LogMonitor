@@ -1,0 +1,54 @@
+--- glusterfs-3.3.0/xlators/mgmt/glusterd/src/glusterd.c	2012-05-30 19:53:26.000000000 +0200
++++ glusterfs-3.3.0/xlators/mgmt/glusterd/src/glusterd.c	2012-06-12 10:27:41.457944822 +0200
+@@ -754,9 +754,12 @@
+         rpcsvc_t          *rpc               = NULL;
+         glusterd_conf_t   *conf              = NULL;
+         data_t            *dir_data          = NULL;
++        data_t            *dir_log           = NULL;    /** added By lahoucine BENLAHMR **/
++
+         struct stat        buf               = {0,};
+         char               voldir [PATH_MAX] = {0,};
+         char               dirname [PATH_MAX];
++		char 			   logdirname [PATH_MAX];       /** added By lahoucine BENLAHMR **/
+         char               cmd_log_filename [PATH_MAX] = {0,};
+         char               hooks_dir [PATH_MAX] = {0,};
+         int                first_time        = 0;
+@@ -805,7 +808,27 @@
+ 
+         gf_log (this->name, GF_LOG_INFO, "Using %s as working directory",
+                 dirname);
++                
++		/** added By lahoucine BENLAHMR **/
++        dir_log = dict_get (this->options, "log-directory");
+ 
++        if (!dir_log) {
++                //Use default working dir
++                strncpy (logdirname, DEFAULT_LOG_FILE_DIRECTORY, PATH_MAX);
++        } else {
++                strncpy (logdirname, dir_log->data, PATH_MAX);
++                #ifdef DEFAULT_LOG_FILE_DIRECTORY
++				#undef DEFAULT_LOG_FILE_DIRECTORY
++				#endif
++
++				#define DEFAULT_LOG_FILE_DIRECTORY logdirname
++        }
++		/*************************/
++		
++		gf_log (this->name, GF_LOG_INFO, "Using %s as log directory",
++                DEFAULT_LOG_FILE_DIRECTORY);
++                
++		
+         snprintf (cmd_log_filename, PATH_MAX,"%s/.cmd_log_history",
+                   DEFAULT_LOG_FILE_DIRECTORY);
+         ret = gf_cmd_log_init (cmd_log_filename);
+@@ -1157,5 +1180,10 @@
+           .type = GF_OPTION_TYPE_BOOL,
+         },
+ #endif
++		/** added By lahoucine BENLAHMR **/
++        { .key   = {"log-directory"},   
++          .type  = GF_OPTION_TYPE_PATH,
++        },
++		  /*********************************/
+         { .key   = {NULL} },
+ };

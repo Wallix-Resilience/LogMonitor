@@ -1,0 +1,22 @@
+--- glusterfs-3.3.0/rpc/rpc-lib/src/rpcsvc.c	2012-05-30 19:53:23.000000000 +0200
++++ glusterfs-3.3.0/rpc/rpc-lib/src/rpcsvc.c	2012-06-12 10:31:01.073945138 +0200
+@@ -484,15 +484,16 @@
+         if (!actor)
+                 goto err_reply;
+ 
+-        if (0 == svc->allow_insecure && unprivileged && !actor->unprivileged) {
++	
++    //    if (0 == svc->allow_insecure && unprivileged && !actor->unprivileged) {
+                         /* Non-privileged user, fail request */
+-                        gf_log ("glusterd", GF_LOG_ERROR,
++   /*                     gf_log ("glusterd", GF_LOG_ERROR,
+                                 "Request received from non-"
+                                 "privileged port. Failing request");
+                         rpcsvc_request_destroy (req);
+                         return -1;
+         }
+-
++	*/
+         if (req->rpc_err == SUCCESS) {
+                 /* Before going to xlator code, set the THIS properly */
+                 THIS = svc->mydata;
