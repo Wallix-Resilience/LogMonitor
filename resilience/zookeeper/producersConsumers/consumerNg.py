@@ -32,7 +32,7 @@ class LogConsumer():
         self.p = 0
         self.ln = lognormalizer.LogNormalizer(normalizer)
         self.solr = solr
-        self._init_mongo("resilience2")
+        self._init_mongo("resilience3")
 
     def _init_mongo(self,dbName = "resilience"):
         connection = Connection()
@@ -64,6 +64,7 @@ class LogConsumer():
             logLine = {'raw':line.rstrip('\r\n')}
             print "indexing:", line
             self.ln.lognormalize(logLine) 
+            logLine["fileid"] = item.data
             self.index(logLine)
             line = file.readline()
                     
@@ -104,7 +105,7 @@ class LogConsumer():
 def cb_connected(useless, zc, datadir,solr):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' %error)
-    znode_path = '/log_chunk_produced18'
+    znode_path = '/log_chunk_produced22'
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)

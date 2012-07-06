@@ -37,12 +37,12 @@ class LogProducer():
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
-        self._init_mongo("resilience2")
+        self._init_mongo("resilience3")
     
     def _init_mongo(self,dbName = "resilience"):
         connection = Connection()
-        db = connection[dbName]
-        self.mongofs = gridfs.GridFS(db)      
+        self.db = connection[dbName]
+        self.mongofs = gridfs.GridFS(self.db)      
        
         
     def _verify_delay(self,name):
@@ -101,27 +101,12 @@ class LogProducer():
         file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))
            
         FILE_PATH[name] = file_name
-        FILE_D[name] = self.mongofs.new_file(filename = file_name)    
+        FILE_D[name] = self.mongofs.new_file(filename = file_name, machine = name)    
             
         print "keys:", FILE_D.keys()
 
     
-    def _local_publish(self,name):
-        global FILE_D
-        global FILE_PATH
-       
-        FILE_D[name] = None
-        log.msg('Log chunk write on %s' % FILE_PATH[name])
-        self.publish(str(FILE_PATH[name]))
-    
-    def _gridfs_publish(self,name):
-        global FILE_D
-        global FILE_PATH      
-     
-        id =  FILE_D[name]._id
-        FILE_D[name] = None
-        log.msg('Log chunk write on %s' % FILE_PATH[name])
-        self.publish(str(id))
+ 
     
     def produce(self, logLine, name):
         global LINE_PROD
@@ -149,26 +134,48 @@ class LogProducer():
     def commit(self,name):
         global FILE_D
         global FILE_PATH
-        global LINE_PROD
         global TIMERS
         
-        TIMERS[name].stop()
-        LINE_PROD[name] = 0 
+        TIMERS[name].stop()        
         FILE_D[name].close() 
-        
         self._gridfs_publish(name)
-        
+         
     def publish(self, filepath):
         d = self.zcrq.put(filepath)
         d.addCallback(lambda x: log.msg('Log chunk published on queue : %s' % x))
         d.addErrback(lambda x: log.msg('Unable to publish chunk on queue : %s' % x))
+        
+    def _local_publish(self,name):
+        global FILE_D
+        global FILE_PATH
+        global LINE_PROD
+
+        FILE_D[name] = None
+        log.msg('Log chunk write on %s' % FILE_PATH[name])
+        LINE_PROD[name] = 0
+        self.publish(str(FILE_PATH[name]))
+    
+    def _gridfs_publish(self,name):
+        global FILE_D
+        global FILE_PATH      
+        global LINE_PROD
+
+        id =  FILE_D[name]._id
+        FILE_D[name] = None
+        count = LINE_PROD[name]
+        self.db.fs.files.update({'_id':id},{"$set":{"lines":count,"remLines":count}})          
+        log.msg('Log chunk write on %s' % FILE_PATH[name])
+        LINE_PROD[name] = 0
+        self.publish(str(id))
+        
+    
 
 
 
 def cb_connected(useless, zc, datadir):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
-    znode_path = '/log_chunk_produced18'
+    znode_path = '/log_chunk_produced22'
     d = zc.create(znode_path)
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)
