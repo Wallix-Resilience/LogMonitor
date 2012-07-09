@@ -32,7 +32,7 @@ class LogConsumer():
         self.p = 0
         self.ln = lognormalizer.LogNormalizer(normalizer)
         self.solr = solr
-        self._init_mongo("resilience3")
+        self._init_mongo("resilience4")
 
     def _init_mongo(self,dbName = "resilience"):
         connection = Connection()
@@ -47,6 +47,20 @@ class LogConsumer():
                 reactor.callLater(1, _consume)
         reactor.callLater(1, _consume)
     
+    def consume(self):
+        def _consuming(item):
+            log.msg('Consuming %s' % item.data)
+            try:
+                self._gridfs_consum(item)
+                self.solr.commit()
+                log.msg("Indexed in solr: %s" % item.data)   
+                log.msg('Remove %s from log chunk path.' % item.data)
+                item.delete()
+            except Exception, e:
+                log.msg('WARNING unable to suppress %s due to : %s' % (item.data, e))
+        d = self.zcrq.get()
+        d.addCallback(_consuming)
+            
     def _local_consum(self,item):
         file = open(item.data, 'r')
         for line in file:
@@ -69,20 +83,7 @@ class LogConsumer():
             line = file.readline()
                     
            
-    
-    def consume(self):
-        def _consuming(item):
-            log.msg('Consuming %s' % item.data)
-            try:
-                self._gridfs_consum(item)
-                self.solr.commit()
-                log.msg("Indexed in solr: %s" % item.data)   
-                log.msg('Remove %s from log chunk path.' % item.data)
-                item.delete()
-            except Exception, e:
-                log.msg('WARNING unable to suppress %s due to : %s' % (item.data, e))
-        d = self.zcrq.get()
-        d.addCallback(_consuming)
+
 
     def index(self,data):
         for key, value in data.items():
@@ -105,7 +106,7 @@ class LogConsumer():
 def cb_connected(useless, zc, datadir,solr):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' %error)
-    znode_path = '/log_chunk_produced22'
+    znode_path = '/log_chunk_produced24'
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)
