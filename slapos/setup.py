@@ -42,6 +42,7 @@ setup(name=name,
         'zc.buildout': [
           'mongo = slapos.recipe.mongo:Recipe', # Resilience: mongodb recipe
           'zookeeper = slapos.recipe.zookeeper:Recipe', # Resilience: zookeeper recipe
+          'solrCloud = slapos.recipe.solrCloud:Recipe', # Resilience; solrCloud
           'agent = slapos.recipe.agent:Recipe',
           'apache.frontend = slapos.recipe.apache_frontend:Recipe',
           'apachephp = slapos.recipe.apachephp:Recipe',
