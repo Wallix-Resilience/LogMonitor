@@ -5,7 +5,7 @@ import gridfs
 
 class tools():
     
-    def removeFromIndex(self, query, solr,mongodb):
+    def rmFileAndIndex(self, query, solr,mongodb):
         res = solr.search(q=query)
         docs = res.documents
         mongofs = gridfs.GridFS(mongodb)
@@ -28,14 +28,19 @@ class tools():
 
             res = solr.search(q=query)
             docs = res.documents
-
+        
+    def purgeIndex(self,since):
+        pass  
+    
+    def purgeStorage(self,since):
+        pass
+    
+    def purgeIndexStorage(self,since):
+        pass
+    
     def getfile(self, id, dest):
         pass
     
-    
-    
-    
-            
           
     
     
@@ -45,4 +50,4 @@ if __name__ == "__main__":
     connection = Connection()
     db = connection["resilience3"]
     t = tools()
-    t.removeFromIndex("*:*", solr, db)
+    t.rmFileAndIndex("*:*", solr, db)

@@ -8,7 +8,7 @@ from twisted.internet.protocol import ClientFactory, Protocol
 from twisted.python import log
 import os
 
-SERVER_ADDR = "https://localhost:8990"
+SERVER_ADDR = "https://localhost:9999"
 
 class logAgent():
     def __init__(self, directory, server, AgentKey, AgentCertificat):

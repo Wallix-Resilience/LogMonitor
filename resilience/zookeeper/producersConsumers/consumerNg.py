@@ -23,13 +23,16 @@ import bson
 
 log.startLogging(sys.stdout)
 
+MAX_WAIT = 180.0 # interval time between each commit
+MAX_LINE = 40000 # number of lines after which we have to commit
+LINE_CONS = 0    # number of lines consumed
+
 class LogConsumer():
 
     def __init__(self, datadir, znode_path, zcrq, solr, normalizer='/home/lahoucine/src/pylogsparser/normalizers'):
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
-        self.p = 0
         self.ln = lognormalizer.LogNormalizer(normalizer)
         self.solr = solr
         self._init_mongo("resilience4")
@@ -42,9 +45,8 @@ class LogConsumer():
     def consume_many(self):
         def _consume():
             self.consume()
-            self.p += 1
-            if self.p < 1000000:
-                reactor.callLater(1, _consume)
+            reactor.callLater(1, _consume)
+            
         reactor.callLater(1, _consume)
     
     def consume(self):
