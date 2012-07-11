@@ -20,16 +20,17 @@ from mysolr import Solr
 from pymongo import Connection
 import gridfs
 import bson
+from twisted.internet import task
 
 log.startLogging(sys.stdout)
 
 MAX_WAIT = 180.0 # interval time between each commit
-MAX_LINE = 40000 # number of lines after which we have to commit
+MAX_LINE = 5 # number of lines after which we have to commit
 LINE_CONS = 0    # number of lines consumed
 
 class LogConsumer():
 
-    def __init__(self, datadir, znode_path, zcrq, solr, mongodb = "resilience4"
+    def __init__(self, datadir, znode_path, zcrq, solr, mongodb = "resilience6"
                  , normalizer='/home/lahoucine/src/pylogsparser/normalizers'):
         self.datadir = datadir
         self.znode_path = znode_path
@@ -37,7 +38,21 @@ class LogConsumer():
         self.ln = lognormalizer.LogNormalizer(normalizer)
         self.solr = solr
         self._init_mongo(mongodb)
+        self.timer = task.LoopingCall(self._solrCommit)
+        self.consumed = 0
+        
+    def _solrCommit(self, stop=True):
+        print "commit in solr"
+        self.consumed = 0
+        if stop:
+            self.timer.stop()
+        else:
+            self.timer.reset()
+        self.solr.commit()
+        
 
+
+    
     def _init_mongo(self,dbName = "resilience"):
         connection = Connection()
         db = connection[dbName]
@@ -54,8 +69,11 @@ class LogConsumer():
         def _consuming(item):
             log.msg('Consuming %s' % item.data)
             try:
-                self._gridfs_consum(item)
-                self.solr.commit()
+                if not self.timer.running:
+                    self.timer.start(MAX_WAIT, False)
+                
+                self._gridfs_consum(item)    
+                #self.solr.commit()
                 log.msg("Indexed in solr: %s" % item.data)   
                 log.msg('Remove %s from log chunk path.' % item.data)
                 item.delete()
@@ -71,8 +89,15 @@ class LogConsumer():
             print "indexing:", line
             self.ln.lognormalize(logLine) 
             self.index(logLine)
-            
+            self.consumed += 1
+            self._check_consumed()
 
+    def _check_consumed(self):
+        self.consumed += 1
+        print "consumed", self.consumed
+        if self.consumed == MAX_LINE:
+            print "conseumed reached",self.consumed
+            self._solrCommit(False)
     
     def _gridfs_consum(self,item):
         file = self.mongofs.get(bson.ObjectId(item.data))
@@ -84,7 +109,8 @@ class LogConsumer():
             logLine["fileid"] = item.data
             self.index(logLine)
             line = file.readline()
-                    
+            self._check_consumed()
+       
            
 
 
@@ -109,7 +135,7 @@ class LogConsumer():
 def cb_connected(useless, zc, datadir,solr):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' %error)
-    znode_path = '/log_chunk_produced24'
+    znode_path = '/log_chunk_produced26'
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)

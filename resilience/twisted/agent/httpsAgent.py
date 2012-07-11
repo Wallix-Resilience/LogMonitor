@@ -41,11 +41,13 @@ class logAgent():
                                                          line,
                                                          headers={'Content-Type': 'text/plain'}
                                                          )
-                        if not resp['status'] == 200:
+                        print "resp",resp
+
+                        if not resp['status'] == '200':
                             print "request error"
                             return size
                         size += len(line)
-                        print "resp",resp
+                        
                         
                     except socket.error, msg:
                         if socket.errno.errorcode[111] == 'ECONNREFUSED':

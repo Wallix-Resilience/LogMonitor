@@ -37,7 +37,7 @@ class LogProducer():
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
-        self._init_mongo("resilience4")
+        self._init_mongo("resilience6")
     
     def _init_mongo(self,dbName = "resilience"):
         connection = Connection()
@@ -171,7 +171,7 @@ class LogProducer():
 def cb_connected(useless, zc, datadir):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
-    znode_path = '/log_chunk_produced24'
+    znode_path = '/log_chunk_produced26'
     d = zc.create(znode_path)
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)
