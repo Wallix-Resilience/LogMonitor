@@ -7,8 +7,11 @@ from twisted.internet import ssl, reactor
 from twisted.internet.protocol import ClientFactory, Protocol
 from twisted.python import log
 import os
+import socket
+import signal
+from atexit import _exithandlers
 
-SERVER_ADDR = "https://localhost:9999"
+SERVER_ADDR = "https://localhost:8990"
 
 class logAgent():
     def __init__(self, directory, server, AgentKey, AgentCertificat):
@@ -16,24 +19,44 @@ class logAgent():
         self.http = httplib2.Http(disable_ssl_certificate_validation=True)
         self.http.add_certificate(AgentKey, AgentCertificat, '')
         self.lw = LogWatcher(directory,self.sendLine)
+        signal.signal(signal.SIGTERM, self._exitHandler)
+        self.exit = False
+    
+    def _exitHandler(self):
+        self.exit = True
+        print "Exiting... please wait..."
+        
         
     
     def run(self):
         self.lw.loop()
         
     def sendLine(self,filename,lines):
-         for line in lines:
-            if  line.strip():
-                print "line: " ,line
-                resp, content = self.http.request(self.server,
-                                                  'POST',
-                                                  line,
-                                                  headers={'Content-Type': 'text/plain'}
-                                                  )
-                #print resp
-                #print content
+        size = 0
+        for line in lines:
+            if not self.exit:
+                if  line.strip():
+                    print "line: " ,line
+                    try:
+                        resp, content = self.http.request(self.server,
+                                                          'POST',
+                                                         line,
+                                                         headers={'Content-Type': 'text/plain'}
+                                                         )
+                        if not resp['status'] == 200:
+                            print "request error"
+                            return size
+                        size += len(line)
+                        print "resp",resp
+                        
+                    except socket.error, msg:
+                        if socket.errno.errorcode[111] == 'ECONNREFUSED':
+                            print "Socket error: connection refused"
+                        return size
             else:
-                print "empty"
+                return size
+            
+        return size
 
 if __name__ == "__main__":
 

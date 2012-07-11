@@ -9,7 +9,6 @@ import sqlite3
 
 class LogWatcher(object):
 
-
     def __init__(self, folder, callback, extensions=["log",]):
         self.files_map = {}
         self.callback = callback
@@ -105,17 +104,22 @@ class LogWatcher(object):
         file.seek(pos)
         lines = file.readlines()
         
-        size = os.path.getsize(file.name)
+        #size = os.path.getsize(file.name)
+        #self._setposition(file, fid, size)
+        
+        if lines:
+            size = self.callback(file.name, lines)
+            pos += size
+            self._setposition(file, fid, pos)
+
+    def _setposition(self, file, fid, pos):
         try:
-            self.connection.cursor().execute("UPDATE files SET position=? where fid=?",(size,fid))
+            self.connection.cursor().execute("UPDATE files SET position=? where fid=?",(pos,fid))
             self.connection.commit()
          #   print file.name," database updated"
         except Exception as err:
             print("issue while updating position of the file %s: %s",(file.name,err))
-            
-        if lines:
-            self.callback(file.name, lines)
-
+        
     def watch(self, fname):
         try:
             file = open(fname, "r")
@@ -164,8 +168,6 @@ class LogWatcher(object):
     
     def remove_folder(self):
         pass
-    
-    
     
         
 if __name__ == '__main__':
