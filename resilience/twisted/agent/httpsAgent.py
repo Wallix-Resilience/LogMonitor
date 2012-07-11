@@ -26,8 +26,6 @@ class logAgent():
         self.exit = True
         print "Exiting... please wait..."
         
-        
-    
     def run(self):
         self.lw.loop()
         

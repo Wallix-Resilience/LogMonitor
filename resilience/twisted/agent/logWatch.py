@@ -7,13 +7,19 @@ import errno
 import stat
 import sqlite3
 
+
+
 class LogWatcher(object):
 
-    def __init__(self, folder, callback, extensions=["log",]):
+    def __init__(self, folder, callback, extensions=["log",], attempt = 10, attemptWait = 20):
         self.files_map = {}
         self.callback = callback
         self.folder = os.path.realpath(folder)
         self.extensions = extensions
+        self.attemptMax = attempt
+        self.attempWait = attemptWait
+        self.countAttempt = 0
+        
         assert os.path.isdir(self.folder), "%s does not exists" \
                                             % self.folder
         assert callable(callback)
@@ -91,26 +97,32 @@ class LogWatcher(object):
                 self.watch(fname)
 
     def readfile(self, file):
-        pos = 0 
-        fid = None
-        try:
-            fid = self.get_file_id(os.stat(file.name))
-            res = self.connection.cursor().execute("select position from files where fid =?", (fid,) )
-            row = res.fetchone()
-            pos = row[0]
-        except Exception as err:
-            print("Issue while retriving position of %s" % file)
-       # print "position file:", file.name, pos
-        file.seek(pos)
-        lines = file.readlines()
-        
-        #size = os.path.getsize(file.name)
-        #self._setposition(file, fid, size)
-        
-        if lines:
-            size = self.callback(file.name, lines)
-            pos += size
-            self._setposition(file, fid, pos)
+        if self.countAttempt < self.attemptMax:
+            pos = 0 
+            fid = None
+            try:
+                fid = self.get_file_id(os.stat(file.name))
+                res = self.connection.cursor().execute("select position from files where fid =?", (fid,) )
+                row = res.fetchone()
+                pos = row[0]
+            except Exception as err:
+                print("Issue while retriving position of %s" % file)
+           # print "position file:", file.name, pos
+            file.seek(pos)
+            lines = file.readlines()
+            
+            #size = os.path.getsize(file.name)
+            #self._setposition(file, fid, size)
+            
+            if lines:
+                size = self.callback(file.name, lines)
+                pos += size
+                self._setposition(file, fid, pos)
+                if size == 0:
+                    self.countAttempt += 1
+        else:
+            self.countAttempt = 0
+            time.sleep(self.attempWait)
 
     def _setposition(self, file, fid, pos):
         try:

@@ -98,15 +98,11 @@ class LogProducer():
         global FILE_PATH
         global FILE_D
       
-        file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))
-           
+        file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))    
         FILE_PATH[name] = file_name
         FILE_D[name] = self.mongofs.new_file(filename = file_name, machine = name)    
-            
         print "keys:", FILE_D.keys()
 
-    
- 
     
     def produce(self, logLine, name):
         global LINE_PROD

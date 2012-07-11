@@ -29,13 +29,14 @@ LINE_CONS = 0    # number of lines consumed
 
 class LogConsumer():
 
-    def __init__(self, datadir, znode_path, zcrq, solr, normalizer='/home/lahoucine/src/pylogsparser/normalizers'):
+    def __init__(self, datadir, znode_path, zcrq, solr, mongodb = "resilience4"
+                 , normalizer='/home/lahoucine/src/pylogsparser/normalizers'):
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
         self.ln = lognormalizer.LogNormalizer(normalizer)
         self.solr = solr
-        self._init_mongo("resilience4")
+        self._init_mongo(mongodb)
 
     def _init_mongo(self,dbName = "resilience"):
         connection = Connection()
