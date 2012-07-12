@@ -40,7 +40,9 @@ setup(name=name,
       zip_safe=True,
       entry_points={
         'zc.buildout': [
-          'mongo = slapos.recipe.mongo:Recipe', # Resilience: mongodb recipe
+          'mongo = slapos.recipe.mongo:Mongo', # Resilience: mongodb recipe
+          'mongos = slapos.recipe.mongo:Mongos', # Resilience: mongos recipe
+          'mongoConfsrv = slapos.recipe.mongo:MongoConfsrv', # Resilience: mongo config server
           'zookeeper = slapos.recipe.zookeeper:Recipe', # Resilience: zookeeper recipe
           'solrCloud = slapos.recipe.solrCloud:Recipe', # Resilience; solrCloud
           'agent = slapos.recipe.agent:Recipe',

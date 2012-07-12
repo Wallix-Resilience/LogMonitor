@@ -32,14 +32,12 @@ import pkg_resources
 
 
 from slapos.recipe.librecipe import GenericBaseRecipe
-
-
-
+from slapos.recipe.librecipe import BaseSlapRecipe
 
 
 
 class BaseRecipe(GenericBaseRecipe):
-    
+
   def config(self):
     path_list = [] 
 
@@ -58,12 +56,13 @@ class BaseRecipe(GenericBaseRecipe):
 
 
 class Mongos(BaseRecipe):
-  def _install(self):
+  def install(self):
     path_list = []
     mongo_conf = self.config()
     path_list.append(mongo_conf)
 
-
+    mongod_servers = (self.options['servers']).split()
+    
     wrapper = self.createPythonScript(self.options['path'],
                                       'slapos.recipe.librecipe.execute.execute',
       [
@@ -79,12 +78,11 @@ class Mongos(BaseRecipe):
 
 class Mongo(BaseRecipe):
   
-  def _install(self):
+  def install(self):
     path_list = []
     mongo_conf = self.config()
     path_list.append(mongo_conf)
-    mongod_servers = (self.options['servers']).split()
-    
+        
     wrapper = self.createPythonScript(self.options['path'],
                                       'slapos.recipe.librecipe.execute.execute',
       [
@@ -100,7 +98,7 @@ class Mongo(BaseRecipe):
 
 class MongoConfsrv(BaseRecipe):
 
-  def _install(self):
+  def install(self):
     mongo_conf = self.config()
     path_list.append(mongo_conf)
     wrapper = self.createPythonScript(self.options['path'],
