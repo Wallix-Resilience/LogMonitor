@@ -54,7 +54,6 @@ def initServerFactory(producer):
 
 
 
-
 def logProcess(request, producer, name):
     line = request.content.getvalue()
     if  line.strip():

@@ -110,9 +110,6 @@ class LogConsumer():
             self.index(logLine)
             line = file.readline()
             self._check_consumed()
-       
-           
-
 
     def index(self,data):
         for key, value in data.items():
