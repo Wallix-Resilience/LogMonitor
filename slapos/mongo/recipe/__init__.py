@@ -35,14 +35,14 @@ from slapos.recipe.librecipe import GenericBaseRecipe
 
 
 
-class Recipe(GenericBaseRecipe):
-    
 
-  def install(self):
+
+
+class BaseRecipe(GenericBaseRecipe):
+    
+  def config(self):
     path_list = [] 
 
-    
-    # Install lighty
     mongo_arg = dict(
       ip = self.options['ip'],
       port = self.options['port'],
@@ -53,18 +53,66 @@ class Recipe(GenericBaseRecipe):
       self.substituteTemplate(self.getTemplateFilename('mongodb.in'),
                               mongo_arg)
     )
+    return mongo_conf
 
+
+
+class Mongos(BaseRecipe):
+  def _install(self):
+    path_list = []
+    mongo_conf = self.config()
     path_list.append(mongo_conf)
 
 
     wrapper = self.createPythonScript(self.options['path'],
-        'slapos.recipe.librecipe.execute.execute',
-        [
-        os.path.join(self.options['mongo-path'],'mongod'),'--rest','--ipv6','--config',self.options['mongo-conf']
-        ]
+                                      'slapos.recipe.librecipe.execute.execute',
+      [
+      os.path.join(self.options['mongo-path'],'mongos'),'--configdb', mongod_servers, '--rest','--ipv6','--config',self.options['mongo-conf']
+      ]
     )
-      
-    
+
     path_list.append(wrapper)
 
     return path_list
+
+
+
+class Mongo(BaseRecipe):
+  
+  def _install(self):
+    path_list = []
+    mongo_conf = self.config()
+    path_list.append(mongo_conf)
+    mongod_servers = (self.options['servers']).split()
+    
+    wrapper = self.createPythonScript(self.options['path'],
+                                      'slapos.recipe.librecipe.execute.execute',
+      [
+      os.path.join(self.options['mongo-path'],'mongod'),'--rest','--ipv6','--config',self.options['mongo-conf']
+      ]
+    )
+
+    path_list.append(wrapper)
+
+    return path_list
+
+
+
+class MongoConfsrv(BaseRecipe):
+
+  def _install(self):
+    mongo_conf = self.config()
+    path_list.append(mongo_conf)
+    wrapper = self.createPythonScript(self.options['path'],
+                                   'slapos.recipe.librecipe.execute.execute',
+        [
+        os.path.join(self.options['mongo-path'],'mongod'),'--configsvr','--ipv6','--config',self.options['mongo-conf']
+        ]
+    )
+
+    path_list.append(wrapper)
+
+    return path_list
+
+
+

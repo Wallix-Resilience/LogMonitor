@@ -11,13 +11,8 @@ from select import select
 from subprocess import Popen, PIPE, STDOUT
 from threading import Thread
 from time import sleep
+from bson.son import SON
 
-try:
-    # new pymongo
-    from bson.son import SON
-except ImportError:
-    # old pymongo
-    from pymongo.son import SON
 
 # BEGIN CONFIGURATION
 
@@ -25,11 +20,11 @@ except ImportError:
 
 BASE_DATA_PATH='/data/db/sharding/' #warning: gets wiped every time you run this
 MONGO_PATH=os.getenv( "MONGO_HOME" , os.path.expanduser('~/10gen/mongo/') )
-N_SHARDS=3
-N_CONFIG=1 # must be either 1 or 3
-N_MONGOS=1
-CHUNK_SIZE=64 # in MB (make small to test splitting)
-MONGOS_PORT=27017 if N_MONGOS == 1 else 10000 # start at 10001 when multi
+N_SHARDS = 3
+N_CONFIG = 1 # must be either 1 or 3
+N_MONGOS = 1
+CHUNK_SIZE= 64 # in MB (make small to test splitting)
+MONGOS_PORT= 27017 if N_MONGOS == 1 else 10000 # start at 10001 when multi
 USE_SSL=False # set to True if running with SSL enabled
 
 CONFIG_ARGS=[]
