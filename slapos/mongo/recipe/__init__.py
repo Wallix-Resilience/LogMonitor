@@ -61,7 +61,7 @@ class Mongos(BaseRecipe):
     mongo_conf = self.config()
     path_list.append(mongo_conf)
 
-    mongod_servers = (self.options['servers']).split()
+    mongod_servers = " ".join((self.options['servers']).split())
     
     wrapper = self.createPythonScript(self.options['path'],
                                       'slapos.recipe.librecipe.execute.execute',
