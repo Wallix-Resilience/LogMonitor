@@ -25,12 +25,12 @@ from twisted.internet import task
 log.startLogging(sys.stdout)
 
 MAX_WAIT = 180.0 # interval time between each commit
-MAX_LINE = 5 # number of lines after which we have to commit
+MAX_LINE = 500 # number of lines after which we have to commit
 LINE_CONS = 0    # number of lines consumed
 
 class LogConsumer():
 
-    def __init__(self, datadir, znode_path, zcrq, solr, mongodb = "resilience6"
+    def __init__(self, datadir, znode_path, zcrq, solr, mongodb = "resilience10"
                  , normalizer='/home/lahoucine/src/pylogsparser/normalizers'):
         self.datadir = datadir
         self.znode_path = znode_path
@@ -50,13 +50,11 @@ class LogConsumer():
             self.timer.reset()
         self.solr.commit()
         
-
-
     
     def _init_mongo(self,dbName = "resilience"):
         connection = Connection()
-        db = connection[dbName]
-        self.mongofs = gridfs.GridFS(db)
+        self.db = connection[dbName]
+        self.mongofs = gridfs.GridFS(self.db)
             
     def consume_many(self):
         def _consume():
@@ -132,7 +130,7 @@ class LogConsumer():
 def cb_connected(useless, zc, datadir,solr):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' %error)
-    znode_path = '/log_chunk_produced26'
+    znode_path = '/log_chunk_produced31'
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)
