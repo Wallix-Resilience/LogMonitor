@@ -19,6 +19,8 @@ import time
 #
 from pymongo import Connection
 import gridfs
+#
+import argparse
 
 log.startLogging(sys.stdout)
 
@@ -32,14 +34,13 @@ TIMERS = {}
 
 class LogProducer():
 
-    def __init__(self, datadir, znode_path, zcrq):
-        log.msg("log producer init")
+    def __init__(self, datadir, znode_path, zcrq, mongodb = "resilience10", mongoAdd="localhost"):
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
-        self._init_mongo("resilience10")
+        self._init_mongo(mongodb, mongoAdd="localhost")
     
-    def _init_mongo(self,dbName = "resilience"):
+    def _init_mongo(self,dbName = "resilience", mongoAdd = "localhost"):
         connection = Connection()
         self.db = connection[dbName]
         self.mongofs = gridfs.GridFS(self.db)      
@@ -56,7 +57,6 @@ class LogProducer():
         
         TIMERS[name] = TIMERS.get(name,None)
         if not TIMERS[name]:
-            print "timers null"
             TIMERS[name] = task.LoopingCall(self._verify_delay, name)
             
         if not TIMERS[name].running:
@@ -88,8 +88,7 @@ class LogProducer():
         filepath = os.path.join(self.datadir, name, subDirDay, file_name)
         FILE_PATH[name] = filepath
         FILE_D[name] = file(filepath, 'w',0)
-        print "keyss: ",  FILE_D.keys()
-            
+                 
 
       
     
@@ -101,7 +100,7 @@ class LogProducer():
         file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))    
         FILE_PATH[name] = file_name
         FILE_D[name] = self.mongofs.new_file(filename = file_name, machine = name)    
-        print "keys:", FILE_D.keys()
+       
 
     
     def produce(self, logLine, name):
@@ -113,16 +112,15 @@ class LogProducer():
         self._check_timer(name)
         
         LINE_PROD[name] = LINE_PROD.get(name,0)
-        print "LINEEEE PRODDD ", LINE_PROD[name]
+       
         if LINE_PROD[name] == 0:
             self._gridfs_write(name)
             
-        print "keys:", FILE_D.keys()
+       
         logLine = logLine.rstrip("\n") # to avoid blank lines on created file
         FILE_D[name].write('%s\n' % logLine)
         #log.msg("log linee %s" % logLine)
         LINE_PROD[name] += 1
-        print "LINE PRODD Plusssss ", LINE_PROD[name]
         if LINE_PROD[name] == MAX_LINE:
            print "committttttt"
            self.commit(name)
@@ -168,7 +166,7 @@ class LogProducer():
 
 
 
-def cb_connected(useless, zc, datadir):
+def cb_connected(useless, zc, datadir, mongodb, mongoAdd):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
     znode_path = '/log_chunk_produced31'
@@ -177,7 +175,7 @@ def cb_connected(useless, zc, datadir):
     d.addErrback(_err)
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     ############   
-    lp = LogProducer(datadir, znode_path, zcrq)
+    lp = LogProducer(datadir, znode_path, zcrq, mongodb, mongoAdd)
     factory = initServerFactory(lp)
     privKey = os.path.abspath('../../../ssl/ca/privkey.pem')
     caCert = os.path.abspath('../../../ssl/ca/cacert.pem')
@@ -211,13 +209,34 @@ def cb_connected(useless, zc, datadir):
     #reactor.listenTCP(8880,factory)
     ############
     
-if __name__ == "__main__":
-    #sys.path.append("/home/lahoucine/workspace/resilience/resilience/twisted/server") 
+    
+    
+    
+def main():
+    
+    params = sys.argv[1:]
+        
+    parser = argparse.ArgumentParser(description='Log producer with embedded https server ')
+    parser.add_argument('-z','--zkServer',help='address of the zookeeper server', 
+                                          default="localhost:2181", required=True)
+    parser.add_argument('-m','--mongoAddr',help='address of the mongodb server', 
+                                          default="localhost", required=True)
+
+    args = parser.parse_args(params)
+    
     datadir = '/tmp/rawdata'
-    if not os.path.isdir(datadir):
-        os.mkdir(datadir)
-    zc = RetryClient(ZookeeperClient("127.0.0.1:2181"))
+    mongodb = 'resilience10'
+    zkAddr = args.zkServer
+    mongoAddr = args.mongoAddr
+    
+    #if not os.path.isdir(datadir):
+    #    os.mkdir(datadir)
+    zc = RetryClient(ZookeeperClient(zkAddr))
     d = zc.connect()
-    d.addCallback(cb_connected, zc, datadir)
+    d.addCallback(cb_connected, zc, datadir, mongodb, mongoAddr)
     d.addErrback(log.msg)
     reactor.run()
+    
+   
+if __name__ == "__main__":
+    main()

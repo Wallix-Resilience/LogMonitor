@@ -7,9 +7,11 @@ from twisted.internet import ssl, reactor
 from twisted.internet.protocol import ClientFactory, Protocol
 from twisted.python import log
 import os
+import sys
 import socket
 import signal
 from atexit import _exithandlers
+import argparse
 
 SERVER_ADDR = "https://localhost:8990"
 
@@ -58,11 +60,36 @@ class logAgent():
             
         return size
 
-if __name__ == "__main__":
+    
+    
+def main():
+    
+    params = sys.argv[1:]
+        
+    parser = argparse.ArgumentParser(description='An https log agent collector')
+    parser.add_argument('-s','--server',help='address of the collect server', 
+                                          default="https://localhost:8990", required=True)
+    parser.add_argument('-d','--dir',help='directory to watch', 
+                                          default="/tmp/log/", required=True)
+    parser.add_argument('-k','--key',help='path to the certificat key', 
+                                          default="../../../ssl/keys/ss_key_d.pem", required=True)
+    parser.add_argument('-c','--cert',help='path to the certificat', 
+                                          default="../../../ssl/certs/ss_cert_d.pem", required=True)
+    
+    args = parser.parse_args(params)
+    
+    serverAddr = args.server
+    dirToWatch = args.dir
+    k = args.key
+    c = args.cert
 
-    key  =  os.path.abspath('../../../ssl/keys/ss_key_d.pem')
-    cert =  os.path.abspath('../../../ssl/certs/ss_cert_d.pem')
+    key  =  os.path.abspath(k)
+    cert =  os.path.abspath(c)
     print key
     print cert
-    logA = logAgent('/tmp/log/', SERVER_ADDR, key, cert)
+    logA = logAgent(dirToWatch, serverAddr, key, cert)
     logA.run()
+    
+    
+if __name__ == "__main__":
+    main(sys.argv[1:])

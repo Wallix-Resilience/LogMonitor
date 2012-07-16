@@ -168,18 +168,6 @@ class LogWatcher(object):
             file.close()
         self.files_map.clear()
 
-    #
-    def add_file(self):
-        pass
-    
-    def add_folder(self):
-        pass
-    
-    def remove_file(self):
-        pass
-    
-    def remove_folder(self):
-        pass
     
         
 if __name__ == '__main__':
