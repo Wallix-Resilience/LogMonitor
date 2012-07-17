@@ -34,13 +34,13 @@ class LogConsumer():
 
     def __init__(self, datadir, znode_path, zcrq, solr, mongodb = "resilience10"
                  , normalizer='/home/lahoucine/src/pylogsparser/normalizers'
-                 , mongoAddr = "localhost"):
+                 , mongoAddr = "localhost", mongoPort= 28017):
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
         self.ln = lognormalizer.LogNormalizer(normalizer)
         self.solr = solr
-        self._init_mongo(mongodb, mongoAddr)
+        self._init_mongo(mongodb, mongoAddr, mongoPort)
         self.timer = task.LoopingCall(self._solrCommit)
         self.consumed = 0
         
@@ -54,8 +54,8 @@ class LogConsumer():
         self.solr.commit()
         
     
-    def _init_mongo(self,dbName = "resilience", mongoAddr ="localhost"):
-        connection = Connection()
+    def _init_mongo(self,dbName = "resilience", mongoAddr ="localhost", mongoPort = 28017):
+        connection = Connection(mongoAddr,mongoPort)
         self.db = connection[dbName]
         self.mongofs = gridfs.GridFS(self.db)
             
@@ -129,7 +129,7 @@ class LogConsumer():
             log.msg("WARNING unable to index %s due to : %s" % (data,e))
         
 
-def cb_connected(useless, zc, datadir, solr, mongoAddr, normalizer):
+def cb_connected(useless, zc, datadir, solr, mongoAddr, mongoPort, normalizer):
     
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' %error)
@@ -137,7 +137,7 @@ def cb_connected(useless, zc, datadir, solr, mongoAddr, normalizer):
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     #d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     #d.addErrback(_err)
-    lc = LogConsumer(datadir, znode_path, zcrq, solr, "resilience10", normalizer, mongoAddr)
+    lc = LogConsumer(datadir, znode_path, zcrq, solr, "resilience10", normalizer, mongoAddr, mongoPort)
     lc.consume_many()
     #lc.consume()
     
@@ -151,6 +151,8 @@ def main():
                                           default="localhost:2181", required=True)
     parser.add_argument('-m','--mongoAddr',help='address of the mongodb server', 
                                           default="localhost", required=True)
+    parser.add_argument('-p','--mongoPort',help='port of the mongodb server', type=int, 
+                                          default="28017", required=True)
     parser.add_argument('-s','--solrAddr',help='address of the solr server', 
                                           default="http://localhost:8983/solr/collection1/", required=True)
     parser.add_argument('-n','--normalizer',help=' path to pylogs parser normalizers', 
@@ -162,6 +164,7 @@ def main():
     mongodb = 'resilience10'
     zkAddr = args.zkServer
     mongoAddr = args.mongoAddr
+    mongoPort = args.mongoPort
     solrAddr = args.solrAddr
     normalizer = args.normalizer
 
@@ -171,7 +174,7 @@ def main():
     sol = Solr(solrAddr)
     zc = RetryClient(ZookeeperClient(zkAddr))
     d = zc.connect()
-    d.addCallback(cb_connected, zc, datadir, sol, mongoAddr, normalizer)
+    d.addCallback(cb_connected, zc, datadir, sol, mongoAddr, mongoPort, normalizer)
     d.addErrback(log.msg)
     reactor.run()
     

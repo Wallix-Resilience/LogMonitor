@@ -34,14 +34,14 @@ TIMERS = {}
 
 class LogProducer():
 
-    def __init__(self, datadir, znode_path, zcrq, mongodb = "resilience10", mongoAdd="localhost"):
+    def __init__(self, datadir, znode_path, zcrq, mongodb = "resilience10", mongoAdd="localhost", mongoPort = 28017):
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
         self._init_mongo(mongodb, mongoAdd="localhost")
     
-    def _init_mongo(self,dbName = "resilience", mongoAdd = "localhost"):
-        connection = Connection()
+    def _init_mongo(self,dbName = "resilience", mongoAdd = "localhost", mongoPort = 28017 ):
+        connection = Connection(mongoAdd, mongoPort)
         self.db = connection[dbName]
         self.mongofs = gridfs.GridFS(self.db)      
        
@@ -166,7 +166,7 @@ class LogProducer():
 
 
 
-def cb_connected(useless, zc, datadir, mongodb, mongoAdd, host= "localhost", port = 8990):
+def cb_connected(useless, zc, datadir, mongodb, mongoAdd, mongoPort, host= "localhost", port = 8990):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
     znode_path = '/log_chunk_produced31'
@@ -175,7 +175,7 @@ def cb_connected(useless, zc, datadir, mongodb, mongoAdd, host= "localhost", por
     d.addErrback(_err)
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     ############   
-    lp = LogProducer(datadir, znode_path, zcrq, mongodb, mongoAdd)
+    lp = LogProducer(datadir, znode_path, zcrq, mongodb, mongoAdd, mongoPort)
     factory = initServerFactory(lp)
     privKey = os.path.abspath('../../../ssl/ca/privkey.pem')
     caCert = os.path.abspath('../../../ssl/ca/cacert.pem')
@@ -223,9 +223,11 @@ def main():
                                           default="localhost:2181", required=True)
     parser.add_argument('-m','--mongoAddr',help='address of the mongodb server', 
                                           default="localhost", required=True)
+    parser.add_argument('-p','--mongoPort',help='port of the mongodb server', type=int, 
+                                          default="28017", required=True)
     parser.add_argument('-a','--host',help='the hostname to bind to, defaults to localhost', 
                                           default="localhost", required = False)
-    parser.add_argument('-p','--port',help='the port to listen in', type=int, 
+    parser.add_argument('-l','--port',help='the port to listen in', type=int, 
                                           default="8990", required=False)
     
     args = parser.parse_args(params)
@@ -234,6 +236,7 @@ def main():
     mongodb = 'resilience10'
     zkAddr = args.zkServer
     mongoAddr = args.mongoAddr
+    mongoPort = args.mongoPort
     host = args.host
     port = args.port
     
@@ -241,7 +244,7 @@ def main():
     #    os.mkdir(datadir)
     zc = RetryClient(ZookeeperClient(zkAddr))
     d = zc.connect()
-    d.addCallback(cb_connected, zc, datadir, mongodb, mongoAddr, host, port)
+    d.addCallback(cb_connected, zc, datadir, mongodb, mongoAddr, mongoPort, host, port)
     d.addErrback(log.msg)
     reactor.run()
     
