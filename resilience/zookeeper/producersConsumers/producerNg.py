@@ -166,7 +166,7 @@ class LogProducer():
 
 
 
-def cb_connected(useless, zc, datadir, mongodb, mongoAdd):
+def cb_connected(useless, zc, datadir, mongodb, mongoAdd, host= "localhost", port = 8990):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
     znode_path = '/log_chunk_produced31'
@@ -202,9 +202,10 @@ def cb_connected(useless, zc, datadir, mongodb, mongoAdd):
     certVerif = os.path.abspath('../../../ssl/certs/ss_cert_c.pem')
     ctx.load_verify_locations(certVerif)
     
-    reactor.listenSSL(8990, # integer port 
+    reactor.listenSSL(port, # integer port 
                       factory, # our site object
                       contextFactory = sslContext,
+                      interface = host
                       )
     #reactor.listenTCP(8880,factory)
     ############
@@ -217,23 +218,30 @@ def main():
     params = sys.argv[1:]
         
     parser = argparse.ArgumentParser(description='Log producer with embedded https server ')
+    
     parser.add_argument('-z','--zkServer',help='address of the zookeeper server', 
                                           default="localhost:2181", required=True)
     parser.add_argument('-m','--mongoAddr',help='address of the mongodb server', 
                                           default="localhost", required=True)
-
+    parser.add_argument('-a','--host',help='the hostname to bind to, defaults to localhost', 
+                                          default="localhost", required = False)
+    parser.add_argument('-p','--port',help='the port to listen in', type=int, 
+                                          default="8990", required=False)
+    
     args = parser.parse_args(params)
     
     datadir = '/tmp/rawdata'
     mongodb = 'resilience10'
     zkAddr = args.zkServer
     mongoAddr = args.mongoAddr
+    host = args.host
+    port = args.port
     
     #if not os.path.isdir(datadir):
     #    os.mkdir(datadir)
     zc = RetryClient(ZookeeperClient(zkAddr))
     d = zc.connect()
-    d.addCallback(cb_connected, zc, datadir, mongodb, mongoAddr)
+    d.addCallback(cb_connected, zc, datadir, mongodb, mongoAddr, host, port)
     d.addErrback(log.msg)
     reactor.run()
     
