@@ -19,13 +19,15 @@ class Producer(GenericBaseRecipe):
     port = self.options['port']
     zookeeper_addr = self.options['zookeeper-addr']
     mongo_addr = self.options['mongo-addr']
+    mongo_port = self.options['mongo-port']
     producer_bin = self.options['producer-bin']
   
     wrapper = self.createPythonScript(self.options['path'],
                                       'slapos.recipe.librecipe.execute.execute',
                                       [ producer_bin,
                                         '-z', zookeeper_addr, '-m', mongo_addr,
-                                        '-a', ip, '-p', port ]
+                                        '-p', mongo_port,
+                                        '-a', ip, '-l', port ]
                                       )
     path_list.append(wrapper)
     return path_list
@@ -38,15 +40,17 @@ class Consumer(GenericBaseRecipe):
 
     zookeeper_addr = self.options['zookeeper-addr']
     mongo_addr = self.options['mongo-addr']
+    mongo_port = self.options['mongo-port']
     solr_addr = self.options['solr-addr']
     normalizer =  pkg_resources.resource_filename(__name__, "normalizers")
-    print normalizer
+
     consumer_bin = self.options['consumer-bin']
   
     wrapper = self.createPythonScript(self.options['path'],
                                       'slapos.recipe.librecipe.execute.execute',
                                       [consumer_bin,
                                        '-z', zookeeper_addr, '-m',mongo_addr ,
+                                       '-p', mongo_port,
                                        '-s', solr_addr, '-n', normalizer]
                                       )
     path_list.append(wrapper)

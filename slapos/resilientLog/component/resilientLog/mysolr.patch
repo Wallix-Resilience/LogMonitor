@@ -1,0 +1,23 @@
+--- mysolr/mysolr.py	2012-07-09 21:29:24.000000000 +0200
++++ myslor/mysolr.py	2012-07-17 17:22:03.707070043 +0200
+@@ -153,9 +153,8 @@
+         :param expunge_deletes: Merge segments with deletes away (default is False)
+ 
+         """
+-        xml = '<commit waitFlush="%s" waitSearcher="%s" expungeDeletes="%s" />' % ('true' if wait_flush else 'false',
+-                                                                                   'true' if wait_searcher else 'false',
+-                                                                                   'true' if expunge_deletes else 'false')
++        xml = '<commit  waitSearcher="%s" expungeDeletes="%s" />' % ('true' if wait_searcher else 'false',
++                                                                     'true' if expunge_deletes else 'false')
+         http_response = self._post_xml(xml)
+         return SolrResponse(http_response)
+ 
+@@ -271,7 +270,7 @@
+ 
+         :param json_doc: JSON document to be posted.
+         """
+-        url = urljoin(self.base_url, 'update/json')
++        url = urljoin(self.base_url, 'update')
+         json_data = json_doc.encode('utf-8')
+         headers = {
+             'Content-type': 'application/json; charset=utf-8',
