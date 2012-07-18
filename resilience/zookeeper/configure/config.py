@@ -2,13 +2,18 @@
 
 from txzookeeper.client import ZookeeperClient
 from txzookeeper.retry import RetryClient
+import sys
 
+from twisted.python import log
+from twisted.internet import reactor, defer
+
+log.startLogging(sys.stdout)
 
 
 class Config():
         
     def __init__(self, zkAddr):
-        self.zk = RetryClient(ZookeeperClient(zkAddr))
+        self.zk = zkAddr
         
     
     def add_mongod(self, mongod):
@@ -35,20 +40,24 @@ class Config():
     def _get_conf(self, path, callback = None):
         
         def _get_value(m):
-            return m[0]
+            value = m[0]
+            if callback:
+                callback(value)
+            print  value
             
         def _call(m):
-            dat, m = self.zc.get_and_watch(path)
-            val = dat.addCallback(_get_value)
-            callback(val)
+            print "func call"
+            dat, m = self.zk.get_and_watch(path)
+            dat.addCallback(_get_value)
+            print "get res", dat.returnValue()
             m.addCallback(_call)
         
         if not callback:
-            data = self.zc.get_data(path)
+            data = self.zk.get(path)
             data.addCallback(_get_value)
             
         else:
-            data, diff = self.zc.get_and_watch(path)
+            data, diff = self.zk.get_and_watch(path)
             data.addCallback(_get_value)
             diff.addCallback(_call)
             
@@ -57,7 +66,20 @@ class Config():
     
     
 if __name__ == "__main__":
-    pass
+    def cb_connected(self, zc):
+        cfg = Config(zc)
+        def _call(m):
+            print "call",m
+        res = cfg._get_conf("/test",_call)
+        print "res", res
+        
+        
+    zc = RetryClient(ZookeeperClient("127.0.0.1:2181"))
+    d = zc.connect()
+    d.addCallback(cb_connected, zc)
+    d.addErrback(log.msg)
+    reactor.run()
+
     
     
 
