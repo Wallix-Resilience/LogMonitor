@@ -200,6 +200,7 @@ def cb_connected(useless, zc, datadir, mongodb, mongoAdd, mongoPort, host= "loca
         )
  
     certVerif = os.path.abspath('../../../ssl/certs/ss_cert_c.pem')
+    print "cert:", certVerif
     ctx.load_verify_locations(certVerif)
     
     reactor.listenSSL(port, # integer port 
