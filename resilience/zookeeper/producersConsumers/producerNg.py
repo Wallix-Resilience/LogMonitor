@@ -38,7 +38,7 @@ class LogProducer():
         self.datadir = datadir
         self.znode_path = znode_path
         self.zcrq = zcrq
-        self._init_mongo(mongodb, mongoAdd="localhost")
+        self._init_mongo(mongodb, mongoAdd="localhost", mongoPort)
     
     def _init_mongo(self,dbName = "resilience", mongoAdd = "localhost", mongoPort = 28017 ):
         connection = Connection(mongoAdd, mongoPort)
