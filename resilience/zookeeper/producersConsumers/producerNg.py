@@ -177,8 +177,8 @@ def cb_connected(useless, zc, datadir, mongodb, mongoAdd, mongoPort, host= "loca
     ############   
     lp = LogProducer(datadir, znode_path, zcrq, mongodb, mongoAdd, mongoPort)
     factory = initServerFactory(lp)
-    privKey = os.path.abspath('../../../ssl/ca/privkey.pem')
-    caCert = os.path.abspath('../../../ssl/ca/cacert.pem')
+    privKey = '/srv/slapgrid/slappart19/ssl/ca/privkey.pem'
+    caCert = '/srv/slapgrid/slappart19/ssl/ca/cacert.pem'
     log.msg("priv: %s" % privKey)
     sslContext = ssl.DefaultOpenSSLContextFactory(privKey, 
                                                   caCert,
@@ -200,7 +200,7 @@ def cb_connected(useless, zc, datadir, mongodb, mongoAdd, mongoPort, host= "loca
         _verifyCallback
         )
  
-    certVerif = os.path.abspath('../../../ssl/certs/ss_cert_c.pem')
+    certVerif = '/srv/slapgrid/slappart19/ssl/certs/ss_cert_c.pem'
     print "cert:", certVerif
     ctx.load_verify_locations(certVerif)
     
