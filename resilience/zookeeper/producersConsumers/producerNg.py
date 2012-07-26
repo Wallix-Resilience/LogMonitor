@@ -179,6 +179,7 @@ def cb_connected(useless, zc, datadir, mongodb, mongoAdd, mongoPort, host= "loca
     factory = initServerFactory(lp)
     privKey = os.path.abspath('../../../ssl/ca/privkey.pem')
     caCert = os.path.abspath('../../../ssl/ca/cacert.pem')
+    log.msg("priv: %s" % privKey)
     sslContext = ssl.DefaultOpenSSLContextFactory(privKey, 
                                                   caCert,
                                                  )
