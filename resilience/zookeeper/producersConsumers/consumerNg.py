@@ -12,7 +12,6 @@ from txzookeeper.queue import ReliableQueue
 from logsparser import lognormalizer
 import solr #solrpy
 import urllib2
-import requests
 import datetime
 from dateutil import tz
 from mysolr import Solr
