@@ -16,7 +16,8 @@ class LogCollect(Resource):
         self.prod = producer   
         self.connection = sqlite3.connect("certificat.db")
         try:
-            #self.connection.cursor().execute('CREATE TABLE nodes (name TEXT, certificat TEXT, PRIMARY KEY(name, certificat))')
+            self.connection.cursor().execute('CREATE TABLE nodes (name TEXT, certificat TEXT, PRIMARY KEY(name, certificat))')
+            self.connection.cursor().execute('INSERT INTO nodes VALUES(?,?)',("machine1","87:88:16:93:9D:95:C1:83:B1:B7:1B:F6:14:FE:2A:67"))
             self.connection.cursor().execute('INSERT INTO nodes VALUES(?,?)',("machine2","87:88:16:93:9D:95:C1:83:B1:B7:1B:F6:14:FE:2A:67"))
             self.connection.commit()
         except Exception as err:
