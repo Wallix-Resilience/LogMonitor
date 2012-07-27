@@ -23,7 +23,7 @@ from twisted.internet import task
 
 import argparse
 
-log.startLogging(sys.stdout)
+log.startLogging(open('./consumer.log', 'w'))
 
 MAX_WAIT = 180.0 # interval time between each commit
 MAX_LINE = 500 # number of lines after which we have to commit
