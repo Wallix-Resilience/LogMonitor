@@ -22,7 +22,7 @@ import gridfs
 #
 import argparse
 
-log.startLogging(sys.stdout)
+log.startLogging(open('./producer.log', 'w'))
 
 COUNT = 0
 MAX_LINE = 500
