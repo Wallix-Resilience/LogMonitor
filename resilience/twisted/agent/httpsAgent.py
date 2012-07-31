@@ -13,7 +13,7 @@ import signal
 from atexit import _exithandlers
 import argparse
 
-SERVER_ADDR = "https://localhost:8990"
+SERVER_ADDR = "https://[2001:470:1f14:169:f02c:cff:fe5d:285c]:9983"
 
 class logAgent():
     def __init__(self, directory, server, AgentKey, AgentCertificat):
@@ -72,9 +72,9 @@ def main():
     parser.add_argument('-d','--dir',help='directory to watch', 
                                           default="/tmp/log/", required=True)
     parser.add_argument('-k','--key',help='path to the certificat key', 
-                                          default="../../../ssl/keys/ss_key_d.pem", required=True)
+                                          default="../../../ssl/keys/ss_key_d.pem", required=False)
     parser.add_argument('-c','--cert',help='path to the certificat', 
-                                          default="../../../ssl/certs/ss_cert_d.pem", required=True)
+                                          default="../../../ssl/certs/ss_cert_d.pem", required=False)
     
     args = parser.parse_args(params)
     
@@ -92,4 +92,4 @@ def main():
     
     
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
