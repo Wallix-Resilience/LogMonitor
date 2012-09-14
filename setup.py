@@ -9,15 +9,19 @@ setup(name='ResilientLog',
       packages = ['resilience',
                   'resilience.zookeeper',
                   'resilience.zookeeper.producersConsumers',
+                  'resilience.zookeeper.configure',
                   'resilience.twisted',
                   'resilience.twisted.agent',
-                  'resilience.twisted.server'],
+                  'resilience.twisted.server',
+                  'resilience.execute'],
       requires=['pylogsparser','solrpy','mysolr','pymongo'],
       entry_points = {        
         'console_scripts': [
             'producer = resilience.zookeeper.producersConsumers.producerNg:main',
             'consumer = resilience.zookeeper.producersConsumers.consumerNg:main',
             'collectAgent = resilience.twisted.agent.httpsAgent:main',
+            'solr = resilience.execute.solr:main',
+            'mongo = resilience.execute.mongo:main'
         ],
       }
 )

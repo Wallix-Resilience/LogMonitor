@@ -1,11 +1,26 @@
+'''
+Wallix
+
+@author: Lahoucine BENLAHMR
+@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
+'''
 from mysolr import Solr
 import bson
 from pymongo import Connection
 import gridfs
 
 class tools():
-    
+    """ 
+    The aim of this class is to give some functions to manage the storage
+    back-ends solr and GridFs  
+    """
     def rmFileAndIndex(self, query, solr,mongodb):
+        """
+        remove logs from solr and GridFS
+        @query: a solr query representing files to remove from solr and GridFS
+        @solr: solr client instance
+        @mongodb: mongodb instance 
+        """
         res = solr.search(q=query)
         docs = res.documents
         mongofs = gridfs.GridFS(mongodb)
@@ -21,6 +36,7 @@ class tools():
                 fileinfo =  mongodb.fs.files.find_one({'_id':bson.ObjectId(fileid)})
                 print fileinfo
                 print doc
+                #if all lignes in a file are not in solr, destruct this file.
                 if not fileinfo == None and fileinfo["remLines"] == 0:
                     print fileinfo["filename"], "will be deleted"
                     mongofs.delete(bson.ObjectId(fileid))
@@ -41,8 +57,6 @@ class tools():
     def getfile(self, id, dest):
         pass
     
-          
-    
     
 if __name__ == "__main__":
     
@@ -50,4 +64,5 @@ if __name__ == "__main__":
     connection = Connection()
     db = connection["resilience3"]
     t = tools()
+    #Exemple: remove all logs in solr 
     t.rmFileAndIndex("*:*", solr, db)

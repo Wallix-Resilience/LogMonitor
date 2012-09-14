@@ -1,6 +1,10 @@
 #!/usr/bin/env python
+'''
+Wallix
 
-
+@author: Lahoucine BENLAHMR
+@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
+'''
 import os
 import time
 import errno
@@ -10,7 +14,7 @@ import sqlite3
 
 
 class LogWatcher(object):
-
+   
     def __init__(self, folder, callback, extensions=["log",], attempt = 10, attemptWait = 20):
         self.files_map = {}
         self.callback = callback

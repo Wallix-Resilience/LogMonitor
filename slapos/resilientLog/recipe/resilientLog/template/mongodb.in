@@ -1,2 +1,0 @@
-dbpath = %(datadir)s
-bind_ip = %(ip)s

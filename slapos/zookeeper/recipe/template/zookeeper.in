@@ -1,4 +1,0 @@
-tickTime = 2000
-dataDir= %(datadir)s
-clientPortAddress= %(ip)s
-clientPort = %(port)s
