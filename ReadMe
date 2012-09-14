@@ -10,21 +10,23 @@ Company: Wallix
 
 Description:
 ------------
-
-
-
-
-
-
-
-
-
-
-
-
+this software is a distributed and fault tolerant log collection for the Cloud
 
 How to:
 -------
+-to work this need an instance of zookeeper.
+-after starting an instance of zookeeper server, we can run producers 
+and consumers:
+
+ -to start a producer: execute resilience/zookeeper/producersConsumers/producerNg.py
+ -to start a consumer: execute resilience/zookeeper/producersConsumers/consumerNg.py
+
+ - to register a machine use : resilience/zookeeper/configure/config.py
+ - to start an Collection agent use: resilience/twisted/httpsAgent.py
+ - to remove indexes and files use: resilience/tools/tools.py
+ - to start an instance of mongoDB use: resilience/execute/mongo.py
+ - to start an instance of solr use: resilience/execute/solr.py
+
 
 
 
