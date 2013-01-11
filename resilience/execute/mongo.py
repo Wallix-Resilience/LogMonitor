@@ -13,16 +13,21 @@ from twisted.internet import reactor, defer, ssl
 from twisted.python import log
 import sys
 import argparse
+import signal
 
 log.startLogging(sys.stdout)
-
+global p
 def cb_connected(self, zc, mongod, ip, port, conf):
-
+    global p
+    
     mongod = mongod.strip()
     ip = ip.strip()
     port = port.strip()
     conf = conf.strip()
     
+
+    d = zc.create("/mongo")
+            
     def _err(error):
         log.msg('node seems to already exists : %s' % error)
     mongo = "%s:%s" % (ip, port)
@@ -37,12 +42,21 @@ def cb_connected(self, zc, mongod, ip, port, conf):
                  ]
     print "args:", arguments
     try:
-        subprocess.call(arguments)
-        print "endddd"
+        p = subprocess.Popen(arguments)
+        #subprocess.call(arguments)
     except:
         reactor.stop()
-
-
+        
+    signal.signal(signal.SIGTERM, handler)
+    signal.signal(signal.SIGKILL, handler)
+    p.wait()
+    
+def handler(signum, frame):
+    global p
+    "terminate process %s ..." % p.pid
+    p.terminate()
+    reactor.stop()
+    
 def main():
     """
     the aim of this code is to start an instance of mongo, and publishing

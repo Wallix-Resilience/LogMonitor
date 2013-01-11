@@ -18,7 +18,6 @@ from twisted.internet import reactor, defer
 
 log.startLogging(sys.stdout)
 
-
 class Config():
     """
     The aim of this class is to centralize and manage  most configurations
@@ -31,21 +30,23 @@ class Config():
         @param zkAddr: Zookeeper client instance.
         """
         self.zk = zkAddr
-        d = self.zk.create("/producers")
-        d.addErrback(self._err)
-        d = self.zk.create("/consumer")
-        d.addErrback(self._err)
-        d = self.zk.create("/mongo")
-        d.addErrback(self._err)
-        d = self.zk.create("/solr")
-        d.addErrback(self._err)
-        d = self.zk.create("/ssl")
-        d.addErrback(self._err)
-        d = self.zk.create("/ssl/ca")
-        d.addErrback(self._err)
-        d = self.zk.create("/nodes")
-        d.addErrback(self._err)
+        self.init_nodes()
         
+    def init_nodes(self):
+        self.init_node("/producers")
+        self.init_node("/consumer")
+        self.init_node("/mongo")
+        self.init_node("/solr")
+        self.init_node("/ssl")
+        self.init_node("/ssl/ca")
+        self.init_node("/nodes")
+        
+    def init_node(self,name):
+        d = self.zk.create(name)
+        d.addErrback(self._err)
+        print "node %s : OK" % name 
+                
+    
     def _err(self,error):
         """
         error handler
@@ -58,19 +59,39 @@ class Config():
         Add the key file of the ca into the configuration tree
         @param key: path to the key file 
         """
-        f = open(key)
-        d = self.zk.create("/ssl/ca/key",f.read())
-        d.addErrback(self._err)
+        if key:
+            d = self.zk.create("/ssl/ca/key", key)
+            d.addErrback(self._err)
         
     def add_certificat_ca(self, cert=None):
         """
         Add the certificate  file of the ca into the configuration tree
         @param cert: path to certificate file 
         """
+        if cert:
+            d = self.zk.create("/ssl/ca/certificat",cert)
+            d.addErrback(self._err)
+        
+        
+    def add_key_ca_file(self, key):
+        """
+        Add the key file of the ca into the configuration tree
+        @param key: path to the key file 
+        """
+        f = open(key)
+        d = self.zk.create("/ssl/ca/key",f.read())
+        d.addErrback(self._err)
+        
+    def add_certificat_ca_file(self, cert=None):
+        """
+        Add the certificate  file of the ca into the configuration tree
+        @param cert: path to certificate file 
+        """
         f = open(cert)
         d = self.zk.create("/ssl/ca/certificat",f.read())
-        d.addErrback(self._err)
-            
+
+
+
     def get_key_ca(self, path=None):
         """
         get ca key from configuration tree
@@ -81,6 +102,7 @@ class Config():
                 path = "."
             path = os.path.abspath(path)
             keyfile = open(os.path.join(path, "ca.key"),"w")
+            print "key's file saved at: %s" % keyfile
             keyfile.write(keydata[0])
             keyfile.close()
             
@@ -97,6 +119,8 @@ class Config():
                 path = "."
             path = os.path.abspath(path)
             keyfile = open(os.path.join(path, "ca.cert"),"w")
+            print "path %s " % path
+            print "certificat's file saved at: %s " % keyfile
             keyfile.write(keydata[0])
             keyfile.close()
             
@@ -238,7 +262,15 @@ class Config():
         @param callback: function to call after getting data
         @param errback: function to call if getting data fails         
         """
+        def _err(self,error):
+            """
+            error handler
+            @param error: error message
+            """
+            log.msg('node seems to already exists : %s' % error)
+            
         data = self.zk.get(path)
+        data.addErrback(_err)
         if callback:
             data.addCallback(callback)
         if errback:
@@ -252,7 +284,6 @@ if __name__ == "__main__":
         def _call(m):
             print "call",m[0]
         #cfg._get_conf_all("/log_chunk_produced42",_call)
-        
         cfg.add_key_ca('../../../ssl/ca/privkey.pem')
         cfg.add_certificat_ca('../../../ssl/ca/cacert.pem')
         #cfg.add_node("dddkdkklqsdmqmdlqmdq", "toto")
@@ -266,7 +297,7 @@ if __name__ == "__main__":
         #cfg._get_data("/nodes/b262d217d3a2faa167d9f9f2a182623405e65dc7632a1ce48840659b7e1de8d",_call)
         cfg.get_key_ca()
         cfg.get_certificat_ca()
-    zc = RetryClient(ZookeeperClient("2001:470:1f14:169:c00d:4cff:fed4:4894:29017"))
+    zc = RetryClient(ZookeeperClient("fd88:9fde:bd6e:f57a:0:1d83:ed10:4574:29017"))
     d = zc.connect()
     d.addCallback(cb_connected, zc)
     d.addErrback(log.msg)
