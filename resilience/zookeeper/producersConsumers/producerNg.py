@@ -1,8 +1,13 @@
 #!/usr/bin/python
+'''
+Wallix
+
+@author: Lahoucine BENLAHMR
+@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
+'''
 from OpenSSL import SSL
 import sys
 import os
-import random
 import time
 import uuid
 from twisted.python import log
@@ -10,19 +15,18 @@ from twisted.internet import reactor, defer, ssl
 from txzookeeper.client import ZookeeperClient
 from txzookeeper.retry import RetryClient
 from txzookeeper.queue import ReliableQueue
-#
 from twisted.internet import task
 import thread
-#
 from resilience.twisted.server.httpsServer import initServerFactory
-import time
-#
+from resilience.twisted.server.httpsServer import LogCollect
 from pymongo import Connection
 import gridfs
-#
+from  pymongo.errors import AutoReconnect
 import argparse
 
-log.startLogging(open('./producer.log', 'w'))
+from resilience.zookeeper.configure.config import Config
+log.startLogging(sys.stdout)
+
 
 COUNT = 0
 MAX_LINE = 500
@@ -33,26 +37,103 @@ FILE_D = {}
 TIMERS = {}
 
 class LogProducer():
+    """
+      This class represent a Producer. Its role is to add tasks to the queue 
+    for consuming. Each task contain a file id.
+    The LogProducer use an HTTPS Server to Collect Logs lines and store them
+    in a distributed file system (GridFS). 
+    The LogProducer can process multiple source of collect using the above
+    informations:
+    
+    -FILE_PATH: the current file name (or the file path) of the source "i" 
+    -FILE_D: the current file descriptor of the source "i"
+    -TIMERS: the source "i" descriptor life's time. After the end of
+             this timer, the source "i" file's descriptor will be closed, And
+             the id of this file will be added in the Queue
+             
+    -LINE_PROD: Used to count lines stored in a file
+    -MAX_LINE: if LINEE_PROD of source "i" is equal to MAX_LINE, the file
+                descriptor (FILE_D) of this source will be closed. And a task 
+                will be added to the Queue
+    """
 
-    def __init__(self, datadir, znode_path, zcrq, mongodb = "resilience10", mongoAdd="localhost", mongoPort = 28017):
-        self.datadir = datadir
+    def __init__(self, znode_path, zk, zcrq, mongodb):
+        """Initialization of the LogProducer
+        @param znode_path:
+        @param zk: Zookeeper client instance  
+        @param zcqr: ReliableQueue instance 
+        @param mongodb: MongoDB database name
+        """ 
+        #TODO: remove znode_path param
         self.znode_path = znode_path
         self.zcrq = zcrq
-        self._init_mongo(mongodb, mongoAdd, mongoPort)
-    
-    def _init_mongo(self,dbName = "resilience", mongoAdd = "localhost", mongoPort = 28017 ):
-        connection = Connection(mongoAdd, mongoPort)
-        self.db = connection[dbName]
-        self.mongofs = gridfs.GridFS(self.db)      
-       
+        self.zk = zk
+        self.conf = Config(zk)
+        self.db = None    
+        self.mongofs = None
+        self._init_mongo(mongodb)
+
         
+               
+    def _init_mongo(self,dbName):
+        """Initialization of a MongoDB instance 
+        """
+        
+        def _connect(mongoAdd, mongoPort, limit):
+            """Connect producer to MongoDB and create a GridFs instance
+            @param mongoAdd: MongoDB address 
+            @param mongoPort: MongoDB port
+            @param limit: initialized to zero for recursive call
+            """
+            try:
+                connection = Connection(mongoAdd, int(mongoPort))
+                self.db = connection[dbName]    
+                self.mongofs = gridfs.GridFS(self.db)
+                print "connected to mongodb: %s:%s" %  (mongoAdd, mongoPort)
+            except AutoReconnect, e:
+                print "mongodb:", e
+                time.sleep(2)
+                #to not reach python's recursion limit - 100
+                if limit < (sys.getrecursionlimit() - 100):
+                    _connect(mongoAdd, mongoPort, limit+1)
+                
+        def _call(m):
+            """Retrieve MonogDB configuration from Zookeeper
+            and call _connect local function             
+            """
+            if m:
+                mg = m[0]
+                #TODO:  catch exception, (need more than one value)
+                #mongoAdd, mongoPort = mg.split(":")
+                mongoAdd, sep, mongoPort = mg.rpartition(":")
+                if mongoAdd == '':
+                    log.msg('mongo: %s is not a correct address', mg)
+                    return 
+                mongoAdd = '[%s]' % mongoAdd
+                print "conf mongo", mongoAdd, mongoPort
+                _connect(mongoAdd, mongoPort,0)
+            else:
+                print "0 Mongo server founded"
+                self.mongofs = None
+                self.bd = None
+                    
+        self.conf.get_mongod_all(_call)
+         
+       
     def _verify_delay(self,name):
+        """ verify if the source "name" reached the timeOut and call commit
+        @param name: name of the source collection
+        """
         global LINE_PROD
         log.msg("Time Out")
         if not LINE_PROD[name] == 0:
             self.commit(name) 
             
     def _check_timer(self,name):
+        """
+        Initialize and manage timers 
+        @param name: name of the source collection 
+        """
         global TIMERS
         
         TIMERS[name] = TIMERS.get(name,None)
@@ -64,92 +145,87 @@ class LogProducer():
             TIMERS[name].start(MAX_WAIT,False)
         else:
             TIMERS[name].reset() 
-            
-    def _local_write(self,name):
-        global LINE_PROD
-        global FILE_PATH
-        global FILE_D
-        global MAX_LINE  
-      
-        file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))
-        nodeDir = os.path.join(self.datadir,name)
-        if not os.path.isdir(nodeDir):
-            os.mkdir(nodeDir)
-            
-        date = time.localtime(time.time())
-        year = date[0]
-        month = date[1]
-        day = date[2]
-        subDirName = "%s-%s-%s" % (day, month, year)
-        subDirDay =   os.path.join(self.datadir,name,subDirName)
-        if not os.path.isdir(subDirDay):
-            os.mkdir(subDirDay)
-                
-        filepath = os.path.join(self.datadir, name, subDirDay, file_name)
-        FILE_PATH[name] = filepath
-        FILE_D[name] = file(filepath, 'w',0)
-                 
-
-      
+                         
     
     def _gridfs_write(self,name):
+        """
+        Create a new file into GridFS for the source collection "name"
+        @param name: name of the source collection
+        @return: LogCollect.Ok if operation succeed, LogColelct.UNAVAILABLE 
+                 otherwise
+        """
         global LINE_PROD
         global FILE_PATH
         global FILE_D
       
         file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))    
         FILE_PATH[name] = file_name
-        FILE_D[name] = self.mongofs.new_file(filename = file_name, machine = name)    
+        try:
+            FILE_D[name] = self.mongofs.new_file(filename = file_name, machine = name)
+            return LogCollect.OK
+        except Exception,e :
+            print "unvailable:",e
+            return LogCollect.UNAVAILABLE
        
-
     
     def produce(self, logLine, name):
+        """
+        initialize all fields (LINE_PROD, FILE_PATH, FILE_D) and call
+        different function to process log lines
+        @param logLine: logLine to proceed 
+        @param name: name of the source collection 
+        @return: LogCollect.OK if producing succeeded 
+        """
         global LINE_PROD
         global FILE_PATH
         global FILE_D
         global MAX_LINE      
-
+        #TODO: verify if zookeeper is up
         self._check_timer(name)
-        
         LINE_PROD[name] = LINE_PROD.get(name,0)
-       
+        status = LogCollect.OK
         if LINE_PROD[name] == 0:
-            self._gridfs_write(name)
+            try:
+                status = self._gridfs_write(name)
+                if not status == LogCollect.OK:
+                    return status
+            except:
+                return LogCollect.UNAVAILABLE
             
-       
         logLine = logLine.rstrip("\n") # to avoid blank lines on created file
-        FILE_D[name].write('%s\n' % logLine)
-        #log.msg("log linee %s" % logLine)
+        try:
+            FILE_D[name].write('%s\n' % logLine)
+        except:
+             return LogCollect.UNAVAILABLE
         LINE_PROD[name] += 1
         if LINE_PROD[name] == MAX_LINE:
-           print "committttttt"
            self.commit(name)
+        return LogCollect.OK
         
     def commit(self,name):
+        """Close file descriptor, stop timer of the source "name" and  call
+        _gridfs_publish 
+        @param  name: name of the source collection
+        @return: LogCollect.OK if operation succeed
+        """
         global FILE_D
         global FILE_PATH
         global TIMERS
         
-        TIMERS[name].stop()        
-        FILE_D[name].close() 
-        self._gridfs_publish(name)
-         
-    def publish(self, filepath):
-        d = self.zcrq.put(filepath)
-        d.addCallback(lambda x: log.msg('Log chunk published on queue : %s' % x))
-        d.addErrback(lambda x: log.msg('Unable to publish chunk on queue : %s' % x))
-        
-    def _local_publish(self,name):
-        global FILE_D
-        global FILE_PATH
-        global LINE_PROD
-
-        FILE_D[name] = None
-        log.msg('Log chunk write on %s' % FILE_PATH[name])
-        LINE_PROD[name] = 0
-        self.publish(str(FILE_PATH[name]))
-    
+        TIMERS[name].stop()
+        try:        
+            FILE_D[name].close()
+        except:
+            log.msg('Can not close file: %s' % FILE_PATH[name]) 
+        return self._gridfs_publish(name)
+            
     def _gridfs_publish(self,name):
+        """Update the file's meta-data of the source "name".
+        And call publish
+        @param name: source collection name
+        @return: LogCollect.OK if operation succeed, LogCollect.UNAVAILABLE 
+                otherwise.
+        """
         global FILE_D
         global FILE_PATH      
         global LINE_PROD
@@ -157,96 +233,112 @@ class LogProducer():
         id =  FILE_D[name]._id
         FILE_D[name] = None
         count = LINE_PROD[name]
-        self.db.fs.files.update({'_id':id},{"$set":{"lines":count,"remLines":count}})          
+        try:
+            self.db.fs.files.update({'_id':id},{"$set":{"lines":count,"remLines":count, "position":0}})
+        except:
+            return LogCollect.UNAVAILABLE
+                  
         log.msg('Log chunk write on %s' % FILE_PATH[name])
         LINE_PROD[name] = 0
+        #TODO: verify publishing
         self.publish(str(id))
+        return LogCollect.OK
         
+    def publish(self, filepath):
+        """ Publish the collected file in the Queue
+        @param filepath: file Id 
+        """
+        d = self.zcrq.put(filepath)
+        d.addCallback(lambda x: log.msg('Log chunk published on queue : %s' % x))
+        d.addErrback(lambda x: log.msg('Unable to publish chunk on queue : %s' % x))
+
+
+global count 
+count = 0
+def config_ssl(zc, factory, host, port):
+    global count
+    cfg = Config(zc)
+    path = "."
+    cfg.get_key_ca(path)
+    cfg.get_certificat_ca(path)
+    keyfile = os.path.join(path,"ca.key")
+    certfile = os.path.join(path, "ca.cert")
+    #verfy if ca files was retrieved from zookeeper                                                               
+    if not os.path.exists(keyfile) or not os.path.exists(certfile):
+        if count > 10:
+            print "producer will be stoped..."
+            reactor.callFromThread(reactor.stop)
+            return 
+        count += 1
+        reactor.callLater(2, config_ssl, zc, factory, host, port)
+        return 
     
 
+    try:
+        sslContext = ssl.DefaultOpenSSLContextFactory(keyfile,
+                                                  certfile,
+                                                 )
+        log.msg("SSL certificat configured")
+        ctx = sslContext.getContext()
+        reactor.listenSSL(port, # integer port                                                                                         
+                          factory, # our site object                                                                                   
+                          contextFactory = sslContext,
+                          interface = host
+                          )
+    except Exception, e:
+        log.msg(e)
+        reactor.stop()
+        return
 
 
-def cb_connected(useless, zc, datadir, mongodb, mongoAdd, mongoPort, host= "localhost", port = 8990):
+def initQueue(zc, mongodb):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
-    znode_path = '/log_chunk_produced31'
+    znode_path = '/log_chunk_produced42'
     d = zc.create(znode_path)
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
-    ############   
-    lp = LogProducer(datadir, znode_path, zcrq, mongodb, mongoAdd, mongoPort)
-    factory = initServerFactory(lp)
-    privKey = '/srv/slapgrid/slappart19/ssl/ca/privkey.pem'
-    caCert = '/srv/slapgrid/slappart19/ssl/ca/cacert.pem'
-    log.msg("priv: %s" % privKey)
-    sslContext = ssl.DefaultOpenSSLContextFactory(privKey, 
-                                                  caCert,
-                                                 )
-    #
-    def _verifyCallback(connection, x509, errnum, errdepth, ok):
-        print "verify digest: ", x509.digest("md5")
-        if not ok:
-            log.msg('invalid cert from subject:%s' % x509.get_subject())
-            return True
-        else:
-            log.msg("Certs are fine: %s " % x509.get_subject())
-        return True
-    
-    ctx = sslContext.getContext()
+    lp = LogProducer(znode_path,zc, zcrq, mongodb)
+    return lp
 
-    ctx.set_verify(
-        SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT,
-        _verifyCallback
-        )
- 
-    certVerif = '/srv/slapgrid/slappart19/ssl/certs/ss_cert_c.pem'
-    print "cert:", certVerif
-    ctx.load_verify_locations(certVerif)
-    
-    reactor.listenSSL(port, # integer port 
-                      factory, # our site object
-                      contextFactory = sslContext,
-                      interface = host
-                      )
-    #reactor.listenTCP(8880,factory)
-    ############
-    
-    
-    
-    
+def cb_connected(useless, zc , mongodb, host, port):
+    """
+    Create a reliable Queue and an HTTPS server
+    and Start an instance of producer
+    @param zc:
+    @param mongodb: MongoDB dataBase name 
+    @param host: address of embedded HTTPS server to create 
+    @param port: port of embedded HTTPS server to create 
+    """ 
+    log.msg("Connected To Zookeeper")
+    lp = initQueue(zc, mongodb)
+    factory = initServerFactory(lp, zc)
+    config_ssl(zc, factory, host, port)
+
+           
 def main():
-    
+    """
+    bootstrap function
+    """
     params = sys.argv[1:]
-        
     parser = argparse.ArgumentParser(description='Log producer with embedded https server ')
-    
     parser.add_argument('-z','--zkServer',help='address of the zookeeper server', 
                                           default="localhost:2181", required=True)
-    parser.add_argument('-m','--mongoAddr',help='address of the mongodb server', 
-                                          default="localhost", required=True)
-    parser.add_argument('-p','--mongoPort',help='port of the mongodb server', type=int, 
-                                          default="28017", required=True)
     parser.add_argument('-a','--host',help='the hostname to bind to, defaults to localhost', 
                                           default="localhost", required = False)
-    parser.add_argument('-l','--port',help='the port to listen in', type=int, 
-                                          default="8990", required=False)
+    parser.add_argument('-p','--port',help='the port to listen in', type=int, 
+                                          default="8991", required=False)
     
     args = parser.parse_args(params)
-    
-    datadir = '/tmp/rawdata'
-    mongodb = 'resilience10'
+    mongodb = 'resilience21'
     zkAddr = args.zkServer
-    mongoAddr = args.mongoAddr
-    mongoPort = args.mongoPort
     host = args.host
     port = args.port
     
-    #if not os.path.isdir(datadir):
-    #    os.mkdir(datadir)
     zc = RetryClient(ZookeeperClient(zkAddr))
     d = zc.connect()
-    d.addCallback(cb_connected, zc, datadir, mongodb, mongoAddr, mongoPort, host, port)
+    d.addCallback(cb_connected, zc, mongodb, host, port)
     d.addErrback(log.msg)
     reactor.run()
     
