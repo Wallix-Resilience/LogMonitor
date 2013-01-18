@@ -98,13 +98,14 @@ class Config():
         @param path: to location where to store the key 
         """
         def _call(keydata, path):
-            if path == None:
-                path = "."
-            path = os.path.abspath(path)
-            keyfile = open(os.path.join(path, "ca.key"),"w")
-            print "key's file saved at: %s" % keyfile
-            keyfile.write(keydata[0])
-            keyfile.close()
+            if keydata:
+                if path == None:
+                    path = "."
+                path = os.path.abspath(path)
+                keyfile = open(os.path.join(path, "ca.key"),"w")
+                print "key's file saved at: %s" % keyfile
+                keyfile.write(keydata[0].strip())
+                keyfile.close()
             
         self._get_data("/ssl/ca/key",lambda x:_call(x, path))
         
@@ -115,15 +116,16 @@ class Config():
         @param path: the location where to store the certificate
         """
         def _call(keydata, path):
-            if path == None:
-                path = "."
-            path = os.path.abspath(path)
-            keyfile = open(os.path.join(path, "ca.cert"),"w")
-            print "path %s " % path
-            print "certificat's file saved at: %s " % keyfile
-            keyfile.write(keydata[0])
-            keyfile.close()
-            
+            if keydata:
+                if path == None:
+                    path = "."
+                path = os.path.abspath(path)
+                keyfile = open(os.path.join(path, "ca.cert"),"w")
+                print "path %s " % path
+                print "certificat's file saved at: %s " % keyfile
+                keyfile.write(keydata[0].strip())
+                keyfile.close()
+        
         self._get_data("/ssl/ca/certificat",lambda x:_call(x, path))
     
 
@@ -262,7 +264,7 @@ class Config():
         @param callback: function to call after getting data
         @param errback: function to call if getting data fails         
         """
-        def _err(self,error):
+        def _err(error):
             """
             error handler
             @param error: error message
@@ -284,8 +286,8 @@ if __name__ == "__main__":
         def _call(m):
             print "call",m[0]
         #cfg._get_conf_all("/log_chunk_produced42",_call)
-        cfg.add_key_ca('../../../ssl/ca/privkey.pem')
-        cfg.add_certificat_ca('../../../ssl/ca/cacert.pem')
+        #cfg.add_key_ca('../../../ssl/ca/privkey.pem')
+        #cfg.add_certificat_ca('../../../ssl/ca/cacert.pem')
         #cfg.add_node("dddkdkklqsdmqmdlqmdq", "toto")
         
         # cfg._get_conf_data("/configs/myconf/schema.xml",_call)
@@ -293,11 +295,11 @@ if __name__ == "__main__":
         #cfg.get_solr_all(_call)
         #cfg.get_mongod_all(_call)
         #cfg.add_solr('localhost6:20120')
-        #cfg.add_node("lahoucine")
+        cfg.add_node("lahoucine")
         #cfg._get_data("/nodes/b262d217d3a2faa167d9f9f2a182623405e65dc7632a1ce48840659b7e1de8d",_call)
-        cfg.get_key_ca()
-        cfg.get_certificat_ca()
-    zc = RetryClient(ZookeeperClient("fd88:9fde:bd6e:f57a:0:1d83:ed10:4574:29017"))
+        #cfg.get_key_ca()
+        #cfg.get_certificat_ca()
+    zc = RetryClient(ZookeeperClient("fd88:9fde:bd6e:f57a:0:1d83:ed10:a8b7:29017"))
     d = zc.connect()
     d.addCallback(cb_connected, zc)
     d.addErrback(log.msg)

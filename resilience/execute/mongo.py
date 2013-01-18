@@ -48,7 +48,6 @@ def cb_connected(self, zc, mongod, ip, port, conf):
         reactor.stop()
         
     signal.signal(signal.SIGTERM, handler)
-    signal.signal(signal.SIGKILL, handler)
     p.wait()
     
 def handler(signum, frame):
