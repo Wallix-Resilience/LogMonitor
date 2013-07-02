@@ -24,6 +24,8 @@ setup(name='ResilientLog',
             'collectAgent = resilience.twisted.agent.httpsAgent:main',
             'solr = resilience.execute.solr:main',
             'mongo = resilience.execute.mongo:main',
+            'mongoshardinit = resilience.execute.mongo:initsharding',
+            'mongoaddshards = resilience.execute.mongo:addshards',
             'cli = resilience.zookeeper.cli.cli2:main'
         ],
       }

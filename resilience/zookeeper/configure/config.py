@@ -299,7 +299,7 @@ if __name__ == "__main__":
         #cfg._get_data("/nodes/b262d217d3a2faa167d9f9f2a182623405e65dc7632a1ce48840659b7e1de8d",_call)
         #cfg.get_key_ca()
         #cfg.get_certificat_ca()
-    zc = RetryClient(ZookeeperClient("fd88:9fde:bd6e:f57a:0:1d83:ed10:a8b7:29017"))
+    zc = RetryClient(ZookeeperClient("fd88:9fde:bd6e:f57a:ad39:fd7b:9dea:615:29017"))
     d = zc.connect()
     d.addCallback(cb_connected, zc)
     d.addErrback(log.msg)

@@ -70,10 +70,12 @@ class LogConsumer():
             """
             if s:
                 addr, sep, port =s[0].rpartition(":")
-                if addr.count(':') > 0:                
-                    solrAddr = "http://[%s]:%s/solr/collection1/" % (addr, port)
-                else:
-                    solrAddr = "http://%s:%s/solr/collection1/" % (addr, port)
+                #if addr.count(':') > 0:                
+                #    solrAddr = "http://[%s]:%s/solr/collection1/" % (addr, port)
+                #    print "addddr", solrAddr
+                #else:
+                solrAddr = "http://%s:%s/solr/collection1/" % (addr, port)
+                print "addddr", solrAddr
                 try:
                     self.solr = Solr(solrAddr)
                     log.msg("connected to solr: %s" % solrAddr )
@@ -98,10 +100,11 @@ class LogConsumer():
                 print "connected to mongodb: %s:%s" %  (mongoAdd, mongoPort)
             except AutoReconnect, e:
                 print "mongodb:", e
-                time.sleep(2)
+                #time.sleep(2)
+                reactor.callLater(2, _connect, mongoAdd, mongoPort, limit)#TODO: test callLater
                 #to not reach python's recursion limit - 100
-                if limit < (sys.getrecursionlimit() - 100):
-                    _connect(mongoAdd, mongoPort, limit+1)
+                #if limit < (sys.getrecursionlimit() - 100):
+                #   _connect(mongoAdd, mongoPort, limit+1)
                 
         def _call(m):
             """Retrieve MonogDB configuration from Zookeeper
@@ -159,10 +162,9 @@ class LogConsumer():
                     log.msg("Not totaly indexed: %s" % item.data)
                     _requeue(item)
                     log.msg("Requeue of item: %s" % item.data)
-                    
-                
             except Exception, e:
                 log.msg('WARNING unable to suppress %s due to : %s' % (item.data, e))
+                
             d = self.zcrq.get()
             d.addCallback(_consuming)
             
@@ -326,7 +328,7 @@ def main():
     params = sys.argv[1:]
     parser = argparse.ArgumentParser(description='A log consumer')
     parser.add_argument('-z','--zkServer',help='address of the zookeeper server', 
-                                          default="localhost:2181", required=True)
+                                          default="fd88:9fde:bd6e:f57a:0:1d7b:9dea:802:29017", required=True)
     parser.add_argument('-n','--normalizer',help=' path to pylogs parser normalizers', 
                                           default="/home/lahoucine/src/pylogsparser/normalizers", required=True)
     

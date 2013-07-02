@@ -19,10 +19,10 @@ from atexit import _exithandlers
 import argparse
 
 
-KEY = "5b89b6d233a48c1ede59b224ec065c87fbe0d73015244d9c6be3c9f55a05f041"
+KEY = "b273bca26dc6b6439765b05b88d60d3158a7214f7bc0a643a2f62825866a07fe"
 #SERVER_ADDR = "https://localhost:8991/%s" % KEY
 #SERVER_ADDR = "https://[2001:470:1f14:169:c00d:4cff:fed4:4894]:9983/%s" % KEY
-SERVER_ADDR = "https://[fd88:9fde:bd6e:f57a:0:1d83:ed10:a8b7]:9983/%s" % KEY
+SERVER_ADDR = "https://[fd88:9fde:bd6e:f57a:ad39:fd7b:9dea:615]:9983/%s" % KEY
 
 class logAgent():
     """
