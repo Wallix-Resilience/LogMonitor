@@ -21,6 +21,7 @@ from twisted.internet import task
 import argparse
 from  pymongo.errors import AutoReconnect
 from datetime import datetime, timedelta, tzinfo
+from resilience.zookeeper.DataStorage import MongoGridFs
 
 
 log.startLogging(open('./consumer', 'w'))
@@ -45,18 +46,15 @@ class LogConsumer():
     LINE_CONS: number of lines consumed
     """
     
-    def __init__(self, znode_path, zk, zcrq, mongodb = "resilience21"
-                 , normalizer = ""):
+    def __init__(self, znode_path, zk, zcrq, storage, normalizer = ""):
         self.znode_path = znode_path
         self.zcrq = zcrq
         self.zk = zk
         self.ln = lognormalizer.LogNormalizer(normalizer)
         self.solr = None
-        self.mongofs = None
-        self.db = None
         self.conf = Config(zk)
+        self.storage = storage
         self._init_solr()
-        self._init_mongo(mongodb)
         self.timer = task.LoopingCall(self._solrCommit)
         self.consumed = 0
         
@@ -82,51 +80,7 @@ class LogConsumer():
                 except Exception, e:
                     log.msg("can't connect to solr: %s" % e)
                 
-        self.conf.get_solr_all(_call)
-        
-    def _init_mongo(self,dbName):
-        """Initialization of a MongoDB instance 
-        """
-        def _connect(mongoAdd, mongoPort, limit):
-            """Connect producer to MongoDB and create a GridFs instance
-            @param mongoAdd: MongoDB address 
-            @param mongoPort: MongoDB port
-            @param limit: initialized to zero for recursive call
-            """
-            try:
-                connection = Connection(mongoAdd, int(mongoPort))
-                self.db = connection[dbName]    
-                self.mongofs = gridfs.GridFS(self.db)
-                print "connected to mongodb: %s:%s" %  (mongoAdd, mongoPort)
-            except AutoReconnect, e:
-                print "mongodb:", e
-                #time.sleep(2)
-                reactor.callLater(2, _connect, mongoAdd, mongoPort, limit)#TODO: test callLater
-                #to not reach python's recursion limit - 100
-                #if limit < (sys.getrecursionlimit() - 100):
-                #   _connect(mongoAdd, mongoPort, limit+1)
-                
-        def _call(m):
-            """Retrieve MonogDB configuration from Zookeeper
-            and call local function _connect              
-            """
-            if m:
-                mg = m[0]
-                #TODO:  catch exception, (need more than one value)
-                #mongoAdd, mongoPort = mg.split(":")
-                mongoAdd, sep, mongoPort =mg.rpartition(":")
-                if mongoAdd == '':
-                    log.msg('mongo: %s is not a correct address', mg)
-                    return 
-                mongoAdd = '[%s]' % mongoAdd
-                print "conf mongo", mongoAdd, mongoPort
-                _connect(mongoAdd, mongoPort,0)
-            else:
-                self.mongofs = None
-                self.bd = None
-                    
-        self.conf.get_mongod_all(_call)
-         
+        self.conf.get_solr_all(_call)        
         
     def consume(self):
         """
@@ -152,7 +106,7 @@ class LogConsumer():
                 if not self.timer.running:
                     self.timer.start(MAX_WAIT, False)
                 print "path", item.path                
-                ok = self._gridfs_consum(item)
+                ok = self._consumItem(item)
                 if  ok:    
                     log.msg("Indexed in solr: %s" % item.data)   
                     log.msg('Remove %s from log chunk path.' % item.data)
@@ -198,20 +152,15 @@ class LogConsumer():
         except:
             log.msg("can't commit in solr")
         
-    def _gridfs_consum(self,item):
+    def _consumItem(self,item):
         """
         consume a file from GridFs: parsing + indexing
         @param item: represent the id of the file to consume in GridFS
         @return: true if consuming in GridFS succeed
         """                    
         try:
-            id = bson.ObjectId(item.data)
-            file = self.mongofs.get(id)
-            result = self.db.fs.files.find_one({'_id':id}, {'position':1, '_id':0})
-            position = result['position']
-            print "POSITION:", position
-            file.seek(position)
-            line = file.readline()
+            fileItem = self.storage.getFile(item)
+            line = fileItem.readline()
             # verifier si zookeeper est présent pour ne pas continuer de consomer
             # un fichier dans mongo qui est re-integre a la "queue"
             # while line and zookeeper_ok 
@@ -224,8 +173,8 @@ class LogConsumer():
                 if not ret:
                     return False
                 #save current position after indexing succed
-                self.db.fs.files.update({'_id':id},{"$set":{"position":file.tell()}})
-                line = file.readline()
+                self.storage.updateCurrentPosition(fileItem)
+                line = fileItem.readline()
                 self._check_consumed()
         except Exception, e:
             print e
@@ -317,7 +266,9 @@ def cb_connected(useless, zc, normalizer):
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     #d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     #d.addErrback(_err)
-    lc = LogConsumer(znode_path, zc, zcrq, "resilience21", normalizer)
+    
+    storage = MongoGridFs("resilience21", Config(zc), reactor)
+    lc = LogConsumer(znode_path, zc, zcrq, storage, normalizer)
     lc.consume()
 
 

@@ -23,8 +23,8 @@ from pymongo import Connection
 import gridfs
 from  pymongo.errors import AutoReconnect
 import argparse
-
 from resilience.zookeeper.configure.config import Config
+from resilience.zookeeper.DataStorage import MongoGridFs
 log.startLogging(sys.stdout)
 
 
@@ -57,7 +57,7 @@ class LogProducer():
                 will be added to the Queue
     """
 
-    def __init__(self, znode_path, zk, zcrq, mongodb):
+    def __init__(self, znode_path, zk, zcrq, storage):
         """Initialization of the LogProducer
         @param znode_path:
         @param zk: Zookeeper client instance  
@@ -69,55 +69,9 @@ class LogProducer():
         self.zcrq = zcrq
         self.zk = zk
         self.conf = Config(zk)
-        self.db = None    
-        self.mongofs = None
-        self._init_mongo(mongodb)
+        self.storage = storage
 
-        
-               
-    def _init_mongo(self,dbName):
-        """Initialization of a MongoDB instance 
-        """
-        
-        def _connect(mongoAdd, mongoPort, limit):
-            """Connect producer to MongoDB and create a GridFs instance
-            @param mongoAdd: MongoDB address 
-            @param mongoPort: MongoDB port
-            @param limit: initialized to zero for recursive call
-            """
-            try:
-                connection = Connection(mongoAdd, int(mongoPort))
-                self.db = connection[dbName]    
-                self.mongofs = gridfs.GridFS(self.db)
-                print "connected to mongodb: %s:%s" %  (mongoAdd, mongoPort)
-            except AutoReconnect, e:
-                print "mongodb:", e
-                time.sleep(2)
-                #to not reach python's recursion limit - 100
-                if limit < (sys.getrecursionlimit() - 100):
-                    _connect(mongoAdd, mongoPort, limit+1)
-                
-        def _call(m):
-            """Retrieve MonogDB configuration from Zookeeper
-            and call _connect local function             
-            """
-            if m:
-                mg = m[0]
-                #TODO:  catch exception, (need more than one value)
-                #mongoAdd, mongoPort = mg.split(":")
-                mongoAdd, sep, mongoPort = mg.rpartition(":")
-                if mongoAdd == '':
-                    log.msg('mongo: %s is not a correct address', mg)
-                    return 
-                mongoAdd = '[%s]' % mongoAdd
-                print "conf mongo", mongoAdd, mongoPort
-                _connect(mongoAdd, mongoPort,0)
-            else:
-                print "0 Mongo server founded"
-                self.mongofs = None
-                self.bd = None
-                    
-        self.conf.get_mongod_all(_call)
+   
          
        
     def _verify_delay(self,name):
@@ -145,28 +99,7 @@ class LogProducer():
             TIMERS[name].start(MAX_WAIT,False)
         else:
             TIMERS[name].reset() 
-                         
-    
-    def _gridfs_write(self,name):
-        """
-        Create a new file into GridFS for the source collection "name"
-        @param name: name of the source collection
-        @return: LogCollect.Ok if operation succeed, LogColelct.UNAVAILABLE 
-                 otherwise
-        """
-        global LINE_PROD
-        global FILE_PATH
-        global FILE_D
-      
-        file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))    
-        FILE_PATH[name] = file_name
-        try:
-            FILE_D[name] = self.mongofs.new_file(filename = file_name, machine = name)
-            return LogCollect.OK
-        except Exception,e :
-            print "unvailable:",e
-            return LogCollect.UNAVAILABLE
-       
+                              
     
     def produce(self, logLine, name):
         """
@@ -186,7 +119,7 @@ class LogProducer():
         status = LogCollect.OK
         if LINE_PROD[name] == 0:
             try:
-                status = self._gridfs_write(name)
+                FILE_PATH[name], FILE_D[name], status = self.storage.newFile(name)
                 if not status == LogCollect.OK:
                     return status
             except:
@@ -196,10 +129,10 @@ class LogProducer():
         try:
             FILE_D[name].write('%s\n' % logLine)
         except:
-             return LogCollect.UNAVAILABLE
+            return LogCollect.UNAVAILABLE
         LINE_PROD[name] += 1
         if LINE_PROD[name] == MAX_LINE:
-           self.commit(name)
+            self.commit(name)
         return LogCollect.OK
         
     def commit(self,name):
@@ -213,36 +146,23 @@ class LogProducer():
         global TIMERS
         
         TIMERS[name].stop()
+        fileDescriptor = None
+        linesAmount = None
+        filePath = None
+        
         try:        
             FILE_D[name].close()
+            fileDescriptor = FILE_D[name]
+            FILE_D[name] = None
+            linesAmount = LINE_PROD[name]
+            LINE_PROD[name] = 0
+            filePath = FILE_PATH[name]            
         except:
             log.msg('Can not close file: %s' % FILE_PATH[name]) 
-        return self._gridfs_publish(name)
-            
-    def _gridfs_publish(self,name):
-        """Update the file's meta-data of the source "name".
-        And call publish
-        @param name: source collection name
-        @return: LogCollect.OK if operation succeed, LogCollect.UNAVAILABLE 
-                otherwise.
-        """
-        global FILE_D
-        global FILE_PATH      
-        global LINE_PROD
-
-        id =  FILE_D[name]._id
-        FILE_D[name] = None
-        count = LINE_PROD[name]
-        try:
-            self.db.fs.files.update({'_id':id},{"$set":{"lines":count,"remLines":count, "position":0}})
-        except:
-            return LogCollect.UNAVAILABLE
-                  
-        log.msg('Log chunk write on %s' % FILE_PATH[name])
-        LINE_PROD[name] = 0
-        #TODO: verify publishing
-        self.publish(str(id))
-        return LogCollect.OK
+        fileid, status = self.storage.finalizeFile(fileDescriptor, filePath, linesAmount)
+        if status == LogCollect.OK:
+            self.publish(fileid)
+        return status 
         
     def publish(self, filepath):
         """ Publish the collected file in the Queue
@@ -291,7 +211,7 @@ def config_ssl(zc, factory, host, port):
         return
 
 
-def initQueue(zc, mongodb):
+def initQueue(zc, storage):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
     znode_path = '/log_chunk_produced42'
@@ -299,10 +219,10 @@ def initQueue(zc, mongodb):
     d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     d.addErrback(_err)
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
-    lp = LogProducer(znode_path,zc, zcrq, mongodb)
+    lp = LogProducer(znode_path,zc, zcrq, storage)
     return lp
 
-def cb_connected(useless, zc , mongodb, host, port):
+def cb_connected(useless, zc, host, port):
     """
     Create a reliable Queue and an HTTPS server
     and Start an instance of producer
@@ -312,7 +232,9 @@ def cb_connected(useless, zc , mongodb, host, port):
     @param port: port of embedded HTTPS server to create 
     """ 
     log.msg("Connected To Zookeeper")
-    lp = initQueue(zc, mongodb)
+    mongodb = 'resilience21'
+    storage = MongoGridFs(mongodb, Config(zc), reactor)
+    lp = initQueue(zc, storage)
     factory = initServerFactory(lp, zc)
     config_ssl(zc, factory, host, port)
 
@@ -331,14 +253,13 @@ def main():
                                           default="8991", required=False)
     
     args = parser.parse_args(params)
-    mongodb = 'resilience21'
     zkAddr = args.zkServer
     host = args.host
     port = args.port
     
     zc = RetryClient(ZookeeperClient(zkAddr))
     d = zc.connect()
-    d.addCallback(cb_connected, zc, mongodb, host, port)
+    d.addCallback(cb_connected, zc, host, port)
     d.addErrback(log.msg)
     reactor.run()
     

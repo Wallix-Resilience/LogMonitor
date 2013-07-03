@@ -12,7 +12,7 @@ import uuid
 import time
 from resilience.twisted.server.httpsServer import LogCollect
 from twisted.python import log
-
+import bson
 
 class IFileStorage(Interface):
     '''
@@ -20,24 +20,21 @@ class IFileStorage(Interface):
     
     A storage object is used to store data in a defined file system.
     '''
-    
     def initStorage(self):
         pass    
     
     def newFile(self, resource):
         pass
     
-    def writeData(self):
-        '''
-        write data to the storage object
-        '''
+    def finalizeFile(self, fileDescriptor, filePath, linesAmount):
         pass
     
-    def readData(self):
-        '''
-        Read data from the storage object
-        '''
+    def getFile(self, item):
         pass
+    
+    def updateCurrentPosition(self, fileItem):
+        pass
+    
     
 class IFileStorageZk(Interface):
     pass
@@ -47,13 +44,13 @@ class MongoGridFs(object):
     implements(IFileStorage)
     
     
-    def __init__(self, mongoAdd, mongoPort, dbName):
-        self.mongoAdd = mongoAdd
-        self.mongoPort = mongoPort
-        self.dbName = dbName
+    def __init__(self, dbName, conf, reactor):
+        self.conf = conf
         self.db = None    
         self.mongofs = None
-        
+        self._init_mongo(dbName)
+        self.reactor = reactor
+                
     def newFile(self, resource):
         file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))    
         try:
@@ -64,7 +61,7 @@ class MongoGridFs(object):
             return (None, None, LogCollect.UNAVAILABLE)
         
         
-    def publishFile(self, fileDescriptor, filePath, linesAmount):
+    def finalizeFile(self, fileDescriptor, filePath, linesAmount):
         fileId = fileDescriptor._id
         try:
             self.db.fs.files.update({'_id':fileId},{"$set":{"lines":linesAmount, "remLines":linesAmount, "position":0}})
@@ -72,42 +69,23 @@ class MongoGridFs(object):
             return (None, LogCollect.UNAVAILABLE)
         log.msg('Log chunk write on %s' % filePath)
         return (str(fileId), LogCollect.OK)
-        
-    def _gridfs_publish(self,name):
-        """Update the file's meta-data of the source "name".
-        And call publish
-        @param name: source collection name
-        @return: LogCollect.OK if operation succeed, LogCollect.UNAVAILABLE 
-                otherwise.
-        """
-        global FILE_D
-        global FILE_PATH      
-        global LINE_PROD
-
-        id =  FILE_D[name]._id
-        FILE_D[name] = None
-        count = LINE_PROD[name]
+    
+    def getFile(self, item):
         try:
-            self.db.fs.files.update({'_id':id},{"$set":{"lines":count,"remLines":count, "position":0}})
-        except:
-            return LogCollect.UNAVAILABLE
-                  
-        log.msg('Log chunk write on %s' % FILE_PATH[name])
-        LINE_PROD[name] = 0
-        #TODO: verify publishing
-        self.publish(str(id))
-        return LogCollect.OK
+            fileId = bson.ObjectId(item.data)
+            fileItem = self.mongofs.get(fileId)
+            result = self.db.fs.files.find_one({'_id':fileId}, {'position':1, '_id':0})
+            position = result['position']
+            print "POSITION:", position
+            fileItem.seek(position)
+            return fileItem
+        except Exception, e:
+            print e
+            return None
+                
+    def updateCurrentPosition(self, fileItem):
+        self.db.fs.files.update({'_id': fileItem._id},{"$set":{"position":fileItem.tell()}})
     
-    
-    
-    def writeData(self):
-        pass
-    
-    def readData(self):
-        pass
-    
-    
-
     def _init_mongo(self,dbName):
         """Initialization of a MongoDB instance 
         """
@@ -138,7 +116,7 @@ class MongoGridFs(object):
                 mg = m[0]
                 #TODO:  catch exception, (need more than one value)
                 #mongoAdd, mongoPort = mg.split(":")
-                mongoAdd, sep, mongoPort =mg.rpartition(":")
+                mongoAdd, sep, mongoPort = mg.rpartition(":")
                 if mongoAdd == '':
                     log.msg('mongo: %s is not a correct address', mg)
                     return 
@@ -148,7 +126,6 @@ class MongoGridFs(object):
             else:
                 self.mongofs = None
                 self.bd = None
-                    
         self.conf.get_mongod_all(_call)
     
      
