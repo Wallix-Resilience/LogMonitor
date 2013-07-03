@@ -11,18 +11,12 @@ from txzookeeper.retry import RetryClient
 from txzookeeper.queue import ReliableQueue
 from logsparser import lognormalizer
 from resilience.zookeeper.configure.config import Config
-import solr #solrpy
-from dateutil import tz
-from mysolr import Solr
-from pymongo import Connection
-import gridfs
-import bson
 from twisted.internet import task
 import argparse
 from  pymongo.errors import AutoReconnect
 from datetime import datetime, timedelta, tzinfo
 from resilience.zookeeper.DataStorage import MongoGridFs
-
+from resilience.zookeeper.DataIndexer import SolrIndexer
 
 log.startLogging(open('./consumer', 'w'))
 
@@ -46,41 +40,17 @@ class LogConsumer():
     LINE_CONS: number of lines consumed
     """
     
-    def __init__(self, znode_path, zk, zcrq, storage, normalizer = ""):
+    def __init__(self, znode_path, zk, zcrq, storage, indexer, normalizer = ""):
         self.znode_path = znode_path
         self.zcrq = zcrq
         self.zk = zk
         self.ln = lognormalizer.LogNormalizer(normalizer)
-        self.solr = None
         self.conf = Config(zk)
         self.storage = storage
-        self._init_solr()
-        self.timer = task.LoopingCall(self._solrCommit)
+        self.indexer = indexer
+        self.timer = task.LoopingCall(self._indexCommiter)
         self.consumed = 0
-        
-    
-    def _init_solr(self):
-        """Initialization of a Solr instance 
-        """
-        def _call(s):
-            """Retrieve Solr configuration from Zookeeper
-            and initialize a solr client             
-            """
-            if s:
-                addr, sep, port =s[0].rpartition(":")
-                #if addr.count(':') > 0:                
-                #    solrAddr = "http://[%s]:%s/solr/collection1/" % (addr, port)
-                #    print "addddr", solrAddr
-                #else:
-                solrAddr = "http://%s:%s/solr/collection1/" % (addr, port)
-                print "addddr", solrAddr
-                try:
-                    self.solr = Solr(solrAddr)
-                    log.msg("connected to solr: %s" % solrAddr )
-                except Exception, e:
-                    log.msg("can't connect to solr: %s" % e)
-                
-        self.conf.get_solr_all(_call)        
+             
         
     def consume(self):
         """
@@ -133,9 +103,9 @@ class LogConsumer():
         print "consumed", self.consumed
         if self.consumed == MAX_LINE:
             print "consumption limit reached",self.consumed
-            self._solrCommit(False)
+            self._indexCommiter(False)
             
-    def _solrCommit(self, stop=True):
+    def _indexCommiter(self, stop=True):
         """
         Make a commit in Solr and manage the commit timer
         @param stop: if true, the timer will be stopped else it will be reset
@@ -146,11 +116,7 @@ class LogConsumer():
             self.timer.stop()
         else:
             self.timer.reset()
-        try:
-            self.solr.commit()
-            log.msg("commit in solr")
-        except:
-            log.msg("can't commit in solr")
+        self.indexer.commit()                   
         
     def _consumItem(self,item):
         """
@@ -169,7 +135,7 @@ class LogConsumer():
                 print "indexing:", line
                 self.ln.lognormalize(logLine) 
                 logLine["fileid"] = item.data
-                ret = self.index(logLine)
+                ret = self.indexer.index(logLine)
                 if not ret:
                     return False
                 #save current position after indexing succed
@@ -180,78 +146,6 @@ class LogConsumer():
             print e
             return False
         return True
-    
-    # Yoinked from wlb
-    def update_wlog_for_solr(self, wlog):
-        # Remove some control characters (Solr hates it)
-        for key in wlog.keys():
-            if isinstance(wlog[key], unicode):
-                wlog[key] = wlog[key].translate(UNICODE_CONTROL_CHARACTERS)
-        
-        received_at = datetime.utcnow()
-        if not 'date' in wlog:
-            date = received_at
-        else:
-            date = wlog['date']
-        if not 'body' in wlog:
-            wlog['body'] = wlog['raw']
-            
-        wlog['__d_seconds'] = date.second
-        wlog['__d_ms'] = date.microsecond
-        wlog['__r_seconds'] = received_at.second
-        wlog['__r_ms'] = received_at.microsecond
-        wlog['date'] = date.replace(tzinfo=UTC, second=0, microsecond=0)
-        received_at = received_at.replace(tzinfo=UTC, second=0, microsecond=0)
-        wlog['received_at'] = self._utc_to_string(received_at)
-    
-    def _utc_to_string(self,data):
-        """
-        convert utc to string
-        @param data: utc data
-        @return: the string value of utc
-        """
-        try:
-            value = solr.core.utc_to_string(data)
-        except:
-            pst = tz.gettz('Europe/Paris')
-            value = value.replace(tzinfo=pst)
-            value = solr.core.utc_to_string(data)
-        return value
-
-    def index(self,data):
-        """
-        index data in solr
-        @param data: data to index into solr
-        @return: true if indexing succeed 
-        """
-        self.update_wlog_for_solr(data) 
-        for key, value in data.items():
-            if isinstance(value,datetime):
-                data[key] = self._utc_to_string(value)
-          
-        try:
-            print "json:", data
-            self.solr.update([data],commit=False)
-            return True
-        except Exception, e:
-            log.msg("WARNING unable to index %s due to : %s" % (data,e))
-            return False
-
-
-# Yoinked from python docs
-ZERO = timedelta(0)
-class Utc(tzinfo):
-    """UTC tzinfo instance
-    """
-    def utcoffset(self, dt):
-        return ZERO
-
-    def tzname(self, dt):
-        return "UTC"
-
-    def dst(self, dt):
-        return ZERO
-UTC = Utc()
 
 
 def cb_connected(useless, zc, normalizer):
@@ -267,8 +161,12 @@ def cb_connected(useless, zc, normalizer):
     #d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     #d.addErrback(_err)
     
-    storage = MongoGridFs("resilience21", Config(zc), reactor)
-    lc = LogConsumer(znode_path, zc, zcrq, storage, normalizer)
+    configuration = Config(zc)
+    
+    storage = MongoGridFs("resilience21", configuration, reactor)
+    indexer = SolrIndexer(configuration)
+    
+    lc = LogConsumer(znode_path, zc, zcrq, storage, indexer, normalizer)
     lc.consume()
 
 
