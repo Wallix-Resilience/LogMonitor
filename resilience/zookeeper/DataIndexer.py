@@ -27,7 +27,8 @@ class IDataIndexer(Interface):
     def commit(self):
         pass
     
-    
+    def search(self, query):
+        pass
 
 
 class SolrIndexer(object):
@@ -49,7 +50,6 @@ class SolrIndexer(object):
         for key, value in data.items():
             if isinstance(value,datetime):
                 data[key] = self._utc_to_string(value)
-          
         try:
             print "json:", data
             self.solr.update([data],commit=False)
@@ -94,6 +94,16 @@ class SolrIndexer(object):
             value = value.replace(tzinfo=pst)
             value = solr.core.utc_to_string(data)
         return value
+    
+    
+    def search(self, query):
+        q = { 'q' : query}
+        try:
+            resp = self.solr.search(**q)
+            return resp.documents
+        except Exception, e:
+            print e
+            return []
     
     def commit(self):
         """

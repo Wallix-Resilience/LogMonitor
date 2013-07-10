@@ -139,7 +139,7 @@ class LogConsumer():
                 if not ret:
                     return False
                 #save current position after indexing succed
-                self.storage.updateCurrentPosition(fileItem)
+                self.storage.saveCurrentPosition(fileItem)
                 line = fileItem.readline()
                 self._check_consumed()
         except Exception, e:

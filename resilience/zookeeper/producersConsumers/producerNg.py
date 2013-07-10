@@ -18,7 +18,7 @@ from txzookeeper.queue import ReliableQueue
 from twisted.internet import task
 import thread
 from resilience.twisted.server.httpsServer import initServerFactory
-from resilience.twisted.server.httpsServer import LogCollect
+from resilience.twisted.server.httpsServer import LogCollectHandler as LogCollect
 from pymongo import Connection
 import gridfs
 from  pymongo.errors import AutoReconnect
@@ -173,44 +173,6 @@ class LogProducer():
         d.addErrback(lambda x: log.msg('Unable to publish chunk on queue : %s' % x))
 
 
-global count 
-count = 0
-def config_ssl(zc, factory, host, port):
-    global count
-    cfg = Config(zc)
-    path = "."
-    cfg.get_key_ca(path)
-    cfg.get_certificat_ca(path)
-    keyfile = os.path.join(path,"ca.key")
-    certfile = os.path.join(path, "ca.cert")
-    #verfy if ca files was retrieved from zookeeper                                                               
-    if not os.path.exists(keyfile) or not os.path.exists(certfile):
-        if count > 10:
-            print "producer will be stoped..."
-            reactor.callFromThread(reactor.stop)
-            return 
-        count += 1
-        reactor.callLater(2, config_ssl, zc, factory, host, port)
-        return 
-    
-
-    try:
-        sslContext = ssl.DefaultOpenSSLContextFactory(keyfile,
-                                                  certfile,
-                                                 )
-        log.msg("SSL certificat configured")
-        ctx = sslContext.getContext()
-        reactor.listenSSL(port, # integer port                                                                                         
-                          factory, # our site object                                                                                   
-                          contextFactory = sslContext,
-                          interface = host
-                          )
-    except Exception, e:
-        log.msg(e)
-        reactor.stop()
-        return
-
-
 def initQueue(zc, storage):
     def _err(error):
         log.msg('Queue znode seems to already exists : %s' % error)
@@ -222,7 +184,7 @@ def initQueue(zc, storage):
     lp = LogProducer(znode_path,zc, zcrq, storage)
     return lp
 
-def cb_connected(useless, zc, host, port):
+def cb_connected(useless, zc, host, port, certDir):
     """
     Create a reliable Queue and an HTTPS server
     and Start an instance of producer
@@ -235,9 +197,9 @@ def cb_connected(useless, zc, host, port):
     mongodb = 'resilience21'
     storage = MongoGridFs(mongodb, Config(zc), reactor)
     lp = initQueue(zc, storage)
-    factory = initServerFactory(lp, zc)
-    config_ssl(zc, factory, host, port)
-
+    #factory = initServerFactory(lp, zc, reactor, ".", host, port)
+    #config_ssl(zc, factory, host, port)
+    initServerFactory(lp, zc, reactor, certDir, host, port )
            
 def main():
     """
@@ -251,15 +213,18 @@ def main():
                                           default="localhost", required = False)
     parser.add_argument('-p','--port',help='the port to listen in', type=int, 
                                           default="8991", required=False)
+    parser.add_argument('-c','--certDir',help='the  certificat and key diretory', 
+                                          default="/tmp/", required=False)
     
     args = parser.parse_args(params)
     zkAddr = args.zkServer
     host = args.host
     port = args.port
+    certDir = args.certDir
     
     zc = RetryClient(ZookeeperClient(zkAddr))
     d = zc.connect()
-    d.addCallback(cb_connected, zc, host, port)
+    d.addCallback(cb_connected, zc, host, port, certDir)
     d.addErrback(log.msg)
     reactor.run()
     

@@ -11,7 +11,6 @@ import zookeeper
 import sys
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
-from Crypto import Random
 import os
 from twisted.python import log
 from twisted.internet import reactor, defer
@@ -175,13 +174,7 @@ class Config():
         d = self.zk.create("/producers/%s" % str(producer), flags = zookeeper.EPHEMERAL)
         d.addErrback(self._err)
               
-#    def add_mongod(self, mongod):
-#        d = self.zk.create("/monggodb/mongod/%s" % str(mongod))
-#        d.addErrback(self._err)
-#                        
-#    def add_solr(self, solr):
-#        d =  self.zk.create("/solr/%s" % str(solr))
-#        d.addErrback(self._err)
+
     
     def get_mongod_all(self, callback = None):
         """
@@ -276,35 +269,4 @@ class Config():
         if callback:
             data.addCallback(callback)
         if errback:
-            data.addErrback(errback)
-            
-           
-            
-if __name__ == "__main__":
-    def cb_connected(self, zc):
-        cfg = Config(zc)
-        def _call(m):
-            print "call",m[0]
-        #cfg._get_conf_all("/log_chunk_produced42",_call)
-        #cfg.add_key_ca('../../../ssl/ca/privkey.pem')
-        #cfg.add_certificat_ca('../../../ssl/ca/cacert.pem')
-        #cfg.add_node("dddkdkklqsdmqmdlqmdq", "toto")
-        
-        # cfg._get_conf_data("/configs/myconf/schema.xml",_call)
-        #cfg._get_conf_all("/producers",_call)
-        #cfg.get_solr_all(_call)
-        #cfg.get_mongod_all(_call)
-        #cfg.add_solr('localhost6:20120')
-        cfg.add_node("lahoucine")
-        #cfg._get_data("/nodes/b262d217d3a2faa167d9f9f2a182623405e65dc7632a1ce48840659b7e1de8d",_call)
-        #cfg.get_key_ca()
-        #cfg.get_certificat_ca()
-    zc = RetryClient(ZookeeperClient("fd88:9fde:bd6e:f57a:ad39:fd7b:9dea:615:29017"))
-    d = zc.connect()
-    d.addCallback(cb_connected, zc)
-    d.addErrback(log.msg)
-    reactor.run()
-
-    
-    
-
+            data.addErrback(errback)  

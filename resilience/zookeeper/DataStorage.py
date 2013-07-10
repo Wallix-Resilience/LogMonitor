@@ -10,7 +10,7 @@ import gridfs
 from resilience.zookeeper.configure.config import Config
 import uuid
 import time
-from resilience.twisted.server.httpsServer import LogCollect
+from resilience.twisted.server.httpsServer import LogCollectHandler as LogCollect
 from twisted.python import log
 import bson
 
@@ -19,26 +19,34 @@ class IFileStorage(Interface):
     Interface indicating that this object is a storage object.
     
     A storage object is used to store data in a defined file system.
-    '''
-    def initStorage(self):
-        pass    
-    
+    '''   
     def newFile(self, resource):
-        pass
+        """
+        this method create a new file in the storage for a giving resource name.
+        it must return a file descriptor witch must expose the following methods:
+        - write(data) where data is a string
+        - close()
+        """
+        
     
     def finalizeFile(self, fileDescriptor, filePath, linesAmount):
         pass
     
     def getFile(self, item):
-        pass
+        """
+        this methode returns a file descriptor for givin item.
+        depending in the storage the item can be anything 
+        for example a filePath or the file id ...
+        the file descriptor return must expose a readline methode
+        to read a file ligne by ligne
+        """
     
-    def updateCurrentPosition(self, fileItem):
-        pass
-    
-    
-class IFileStorageZk(Interface):
-    pass
-    
+    def saveCurrentPosition(self, fileItem):
+        """
+        the aim of this method is to save the current position of a giving
+        fileItem represented by a file descriptor
+        """
+
 class MongoGridFs(object):
     
     implements(IFileStorage)
@@ -83,7 +91,7 @@ class MongoGridFs(object):
             print e
             return None
                 
-    def updateCurrentPosition(self, fileItem):
+    def saveCurrentPosition(self, fileItem):
         self.db.fs.files.update({'_id': fileItem._id},{"$set":{"position":fileItem.tell()}})
     
     def _init_mongo(self,dbName):
