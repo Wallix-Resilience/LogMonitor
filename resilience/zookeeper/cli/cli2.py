@@ -9,8 +9,10 @@ import sys
 import httplib2
 from urllib import urlencode
 import socket
-
-
+from twisted.web import http
+import getpass
+import simplejson as json
+import pprint
 
 def request(server, data):
     try:
@@ -20,7 +22,6 @@ def request(server, data):
                                      headers={'Content-type': 'application/x-www-form-urlencoded'},
                                      body=urlencode(data),
                                      )
-        
         return (resp["status"], content)
     except socket.error:
         if socket.errno.errorcode[111] == 'ECONNREFUSED':
@@ -29,36 +30,73 @@ def request(server, data):
     except Exception, e:
         print "Error: ", e
         return (None, None)
-    
+
+def getUser(args):
+    if not args.user:
+        return raw_input('Please provide the admin account (default: admin) : ') or "admin"
+    return args.user
+
+def getPassword(args):
+    if not args.password:
+        return getpass.getpass()
+    else:
+        return args.password
 
 def addSource(args): 
-    data = { 'user': args.user, 'password': args.password, 'source': args.sourceName}
+    data = { 'user': getUser(args), 'password': getPassword(args), 'source': args.sourceName}
     server = "https://%s/%s" % (args.server, "register")
     respcode , content = request(server, data)
-    if respcode == "200":
+    respcode = int(respcode)
+    if respcode == http.OK:
         print "This is your key, keep it secret!: ", content
-    else:
-        print "erro"
+    elif respcode == http.UNAUTHORIZED:
+        print "Bad user or/and password"
+    elif respcode == http.CONFLICT:
+        print "The resource %s already exist!" % args.sourceName
     
 def removeSource(args):
-    data = { 'user': args.user, 'password': args.password, 'source': args.sourceName}
+    data = { 'user': getUser(args), 'password': getPassword(args), 'source': args.sourceName}
     server = "https://%s/%s" % (args.server, "remove")
     respcode , content = request(server, data)
-    if respcode == "200":
+    respcode = int(respcode)
+    if respcode == http.OK:
         print "source %s was removed" % args.sourceName
-    else:
-        print "erro"
-        
+    elif respcode == http.BAD_REQUEST:
+        print "Erro will removing %s" % args.sourceName
+    elif respcode == http.UNAUTHORIZED:
+        print "Bad user or/and password"    
         
 def search(args):
-    data = { 'user': args.user, 'password': args.password, 'query': args.query}
+    data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query}
     server = 'https://%s/%s' % (args.server, 'search')
     respcode , content = request(server, data)
-    if respcode == '200':
-        print content
-    else:
-        print "erro"
+    respcode = int(respcode)
+    if respcode == http.OK:
+        #content_data = json.loads(content)
+        #print simplejson.dumps(simplejson.loads(content), ident=4)
+        #print content_data
+        pprint.pprint(content)
+
         
+    else:
+        data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query}
+        print "Error"
+        
+        
+def changePass(args):
+    pass
+
+def listSources(args):
+    pass
+
+def getFile(args):
+    pass
+
+def removeFiles(args):
+    pass
+
+def removeLogs(args): 
+    pass
         
     
 def main():
@@ -67,7 +105,7 @@ def main():
     
     parser.add_argument('-s','--server',help='address of the producer server', 
                                           default="localhost:8991")
-    parser.add_argument('-u', '--user', help='Administrator user name', default='admin')
+    parser.add_argument('-u', '--user', help='Administrator user name')
     parser.add_argument('-p', '--password', help='Administrator password')
     subparsers = parser.add_subparsers(help='sub-command help')
     

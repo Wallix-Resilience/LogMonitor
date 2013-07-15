@@ -24,7 +24,7 @@ from OpenSSL import crypto, SSL
 from socket import gethostname
 from os.path import exists, join
 from twisted.internet import ssl
-
+import simplejson as json
 log.startLogging(sys.stdout)
 
 class RootResource(Resource):
@@ -49,8 +49,13 @@ class RegisterHandler(Resource):
         sourceName = request.args['source'][0]
         print self.cred.checkUser(user, password)
         if self.cred.checkUser(user, password):
-            return self.cred.addSource(sourceName)
-        return None
+            rep =  self.cred.addSource(sourceName)
+            if not rep:
+                request.setResponseCode(http.CONFLICT)
+                return ""
+            return rep
+        request.setResponseCode(http.UNAUTHORIZED)
+        return ""
         
     def render_GET(self, request):
         request.setResponseCode(http.NOT_FOUND)
@@ -75,8 +80,14 @@ class RemoveHandler(Resource):
         sourceName = request.args['source'][0]
         print self.cred.checkUser(user, password)
         if self.cred.checkUser(user, password):
-            return self.cred.removeSource(sourceName)
-        return None
+            if not self.cred.removeSource(sourceName):
+                request.setResponseCode(http.BAD_REQUEST)
+            else:
+                return "Deleted with success"
+    
+        request.setResponseCode(http.UNAUTHORIZED)
+        return ""
+    
         
     def render_GET(self, request):
         request.setResponseCode(http.NOT_FOUND)
@@ -133,7 +144,10 @@ class searchHandler(Resource):
         password = request.args['password'][0]
         query = request.args['query'][0]
         if self.cred.checkUser(user, password):
-            return str(self.indexer.search(query))
+            request.setHeader('Content-Type', 'Content-Type: text/plain')
+            request.setHeader('charset', 'US-ASCII')
+            #request.setHeader('Transfer-Encoding', 'chunked')
+            return json.dumps(self.indexer.search(query))
             
     def render_GET(self, request):
         request.setResponseCode(http.NOT_FOUND)
@@ -249,15 +263,16 @@ class CredentialStore():
                 self.sources.insert(source)
                 return key
             except:
-                pass				
+                return None				
         return None
     
     def removeSource(self, name):
         try:
             source = {"name" : name}
             self.sources.remove(source)
+            return True
         except:
-            pass
+            return False
 		
     def checkSource(self, key):
         source = self.sources.find_one({"key": key})
