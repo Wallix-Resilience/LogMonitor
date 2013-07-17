@@ -117,8 +117,8 @@ class ChangeHandler(Resource):
                 return "Change Succed"
             else:
                 return  "Error"
-        else:
-            return "Error: UserName or/and password invalid !?"
+        request.setResponseCode(http.UNAUTHORIZED)    
+        return "Error: UserName or/and password invalid !?"
 
     def render_GET(self, request):
 	return """
@@ -147,7 +147,7 @@ class searchHandler(Resource):
             request.setHeader('Content-Type', 'Content-Type: text/plain')
             request.setHeader('charset', 'US-ASCII')
             #request.setHeader('Transfer-Encoding', 'chunked')
-            return json.dumps(self.indexer.search(query))
+            return json.dumps(self.indexer.search(query), sort_keys = False, indent = 4)
             
     def render_GET(self, request):
         request.setResponseCode(http.NOT_FOUND)
@@ -160,6 +160,21 @@ class searchHandler(Resource):
             <input type='submit'>
             </body></html>      
         """
+        
+class GetFileHandler(Resource):
+    
+    def __init__(self, credential):
+        self.cred = credential
+    
+    def render_POST(self, request):
+        user = request.args['user'][0]
+        password = request.args['password'][0]
+        file_id = request.args['fileID'][0]
+        if self.cred.checkUser(user, password):
+            pass
+    
+    def render_GET(self, request):
+        pass
         
 class LogCollectHandler(Resource):
     

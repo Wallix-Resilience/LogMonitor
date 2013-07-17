@@ -12,7 +12,6 @@ import socket
 from twisted.web import http
 import getpass
 import simplejson as json
-import pprint
 
 def request(server, data):
     try:
@@ -72,19 +71,61 @@ def search(args):
     respcode , content = request(server, data)
     respcode = int(respcode)
     if respcode == http.OK:
-        #content_data = json.loads(content)
+        content_data = json.loads(content)
         #print simplejson.dumps(simplejson.loads(content), ident=4)
         #print content_data
-        pprint.pprint(content)
+        #pprint.pprint(content)
+        print content
 
         
     else:
-        data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query}
         print "Error"
         
         
 def changePass(args):
-    pass
+    
+    new_user_name = args.user
+    new_password = args.password
+    #do you want to change the adminuser name:
+    change_user = raw_input('Do you want to change the administrator user name? [NO, YES] : ')
+    change_user = change_user.upper()
+    if change_user not in ("YES", "NO"):
+        print "please choose YES or NO"
+        return 
+    if change_user == "YES":
+        new_user_name = raw_input("Please enter the new admin username: ")
+        
+    change_password = raw_input('Do you want to change the administrator password? [NO, YES] : ')
+    change_password = change_password.upper()
+    if change_password not in ("YES", "NO"):
+        print "Please choose YES or NO"
+        return
+    
+    if change_password == "YES":
+        new_password = getpass.getpass("Please enter the new administrator password: ")
+        new_password_bis = getpass.getpass("Please enter AGAIN the new administrator password: ")
+        if not new_password == new_password_bis:
+            print "the entred passwords dont match!"
+            return
+        
+    if change_password == "NO" and change_user == "NO":
+        print "Operation aborted"
+        return
+    
+    user = getUser(args)
+    password = getPassword(args)
+    data = { 'oUser': user , 'oPass': password, 'nUser': new_user_name or user, 'nPass': new_password or password}
+    print data
+    server = 'https://%s/%s' % (args.server, 'change')
+    print server
+    respcode , content = request(server, data)
+    respcode = int(respcode)
+    print respcode
+    if respcode == http.OK:
+        print "Operation was succed"
+    else:
+        print "Error operation"
+        
 
 def listSources(args):
     pass
@@ -142,7 +183,8 @@ def main():
  
     #create the parser for the 'changePass' command
     parserAddSource = subparsers.add_parser('changePass', help='change the admin Password')
-    parserAddSource.add_argument('password')
+    parserAddSource.set_defaults(func=changePass)
+
     
     
     args = parser.parse_args(params)
