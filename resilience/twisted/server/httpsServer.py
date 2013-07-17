@@ -20,6 +20,7 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto import Random
 from resilience.zookeeper.DataIndexer import SolrIndexer
+from resilience.zookeeper.DataStorage import MongoGridFs
 from OpenSSL import crypto, SSL
 from socket import gethostname
 from os.path import exists, join
@@ -28,13 +29,14 @@ import simplejson as json
 log.startLogging(sys.stdout)
 
 class RootResource(Resource):
-    def __init__(self, credentialStore, producer, indexer):
+    def __init__(self, credentialStore, producer, indexer, storage):
         Resource.__init__(self)
         self.putChild('register', RegisterHandler(credentialStore))
         self.putChild('change', ChangeHandler(credentialStore))
         self.putChild('send', LogCollectHandler(producer, credentialStore))
         self.putChild('search', searchHandler(credentialStore, indexer))
         self.putChild('remove', RemoveHandler(credentialStore))
+        self.putChild('getFile', GetFileHandler(credentialStore, storage))
         
         
 class RegisterHandler(Resource):
@@ -163,18 +165,34 @@ class searchHandler(Resource):
         
 class GetFileHandler(Resource):
     
-    def __init__(self, credential):
+    def __init__(self, credential, storage):
         self.cred = credential
+        self.storage = storage
     
     def render_POST(self, request):
         user = request.args['user'][0]
         password = request.args['password'][0]
         file_id = request.args['fileID'][0]
         if self.cred.checkUser(user, password):
-            pass
+            file = self.storage.getFile(file_id)
+            if file:
+                return file.read()
+            request.setResponseCode(http.NOT_FOUND)
+            return "No File Found"
     
     def render_GET(self, request):
-        pass
+        return """
+            <html><body>use post method to get a file directly or form below:<br><br>
+            <form action='/search' method=POST>
+            Admin    : <input type='text' name='user'><br>
+            Password : <input type='password' name='password'><br>
+            FileID : <input type='text' name='fileID'><br>
+            <input type='submit'>
+            </body></html>      
+        """
+    
+    
+        
         
 class LogCollectHandler(Resource):
     
@@ -199,7 +217,7 @@ class LogCollectHandler(Resource):
         print postpath
         print request.path
         if len(postpath)!= 1 or postpath[0] == '': # if no giving key (postpath)
-            request.setResponseCode(LogCollect.NO) # send code response NO
+            request.setResponseCode(LogCollectHandler.NO) # send code response NO
             return ""
         key = postpath[0]
         log.msg( "session: %s"% request.getSession().uid)
@@ -210,13 +228,13 @@ class LogCollectHandler(Resource):
             if code:
                 request.setResponseCode(int(code))
             else:
-                request.setResponseCode(LogCollect.UNAVAILABLE)                
+                request.setResponseCode(LogCollectHandler.UNAVAILABLE)                
             try:	
                 request.finish()
             except:
 		pass
 	else:
-            request.setResponseCode(LogCollect.NO)
+            request.setResponseCode(LogCollectHandler.NO)
             try:
                 request.finish()
             except:
@@ -243,7 +261,7 @@ def logProcess(request, producer, name):
         return code
     else:
         print "empty"
-        return LogCollect.OK
+        return LogCollectHandler.OK
        
 
 class CredentialStore():
@@ -432,6 +450,8 @@ def initServerFactory(producer, zc, reactor, certDir, host, port):
     """     
     cred = CredentialStore( Config(zc))
     indexer = SolrIndexer( Config(zc))
-    root =  RootResource(cred, producer, indexer)
+    dbName = 'resilience21'
+    storage = MongoGridFs(dbName, Config(zc), reactor)
+    root =  RootResource(cred, producer, indexer, storage)
     factory = Site(root)
     config_ssl(reactor, certDir, factory, host, port)

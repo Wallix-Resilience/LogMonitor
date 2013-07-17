@@ -75,9 +75,7 @@ def search(args):
         #print simplejson.dumps(simplejson.loads(content), ident=4)
         #print content_data
         #pprint.pprint(content)
-        print content
-
-        
+        print content  
     else:
         print "Error"
         

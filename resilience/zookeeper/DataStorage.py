@@ -78,14 +78,15 @@ class MongoGridFs(object):
         log.msg('Log chunk write on %s' % filePath)
         return (str(fileId), LogCollect.OK)
     
-    def getFile(self, item):
+    def getFile(self, item, seek=True):
         try:
             fileId = bson.ObjectId(item.data)
             fileItem = self.mongofs.get(fileId)
             result = self.db.fs.files.find_one({'_id':fileId}, {'position':1, '_id':0})
             position = result['position']
             print "POSITION:", position
-            fileItem.seek(position)
+            if seek:
+                fileItem.seek(position)
             return fileItem
         except Exception, e:
             print e
