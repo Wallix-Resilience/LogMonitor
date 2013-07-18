@@ -20,12 +20,13 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto import Random
 from resilience.zookeeper.DataIndexer import SolrIndexer
-from resilience.zookeeper.DataStorage import MongoGridFs
 from OpenSSL import crypto, SSL
 from socket import gethostname
 from os.path import exists, join
 from twisted.internet import ssl
 import simplejson as json
+from resilience.zookeeper.DataStorage import MongoGridFs
+from resilience.twisted.server.status import Status
 log.startLogging(sys.stdout)
 
 class RootResource(Resource):
@@ -37,7 +38,9 @@ class RootResource(Resource):
         self.putChild('search', searchHandler(credentialStore, indexer))
         self.putChild('remove', RemoveHandler(credentialStore))
         self.putChild('getFile', GetFileHandler(credentialStore, storage))
-        
+        self.putChild('getSources', ListSourceHandler(credentialStore))
+        self.putChild('deleteLogs', DeleteLogsHandler(credentialStore, storage, indexer))
+        self.putChild('purge', PurgeStorageHandler(storage))
         
 class RegisterHandler(Resource):
 	
@@ -145,11 +148,15 @@ class searchHandler(Resource):
         user = request.args['user'][0]
         password = request.args['password'][0]
         query = request.args['query'][0]
+        rows = 500
+        if "rows" in request.args.keys():
+            rows = request.args['rows'][0] 
         if self.cred.checkUser(user, password):
             request.setHeader('Content-Type', 'Content-Type: text/plain')
             request.setHeader('charset', 'US-ASCII')
             #request.setHeader('Transfer-Encoding', 'chunked')
-            return json.dumps(self.indexer.search(query), sort_keys = False, indent = 4)
+            rows = int(rows)
+            return json.dumps(self.indexer.search(query, rows), sort_keys = False, indent = 4)
             
     def render_GET(self, request):
         request.setResponseCode(http.NOT_FOUND)
@@ -159,6 +166,7 @@ class searchHandler(Resource):
             Admin    : <input type='text' name='user'><br>
             Password : <input type='password' name='password'><br>
             query : <input type='text' name='query'><br>
+            rows : <input type='text' name='rows' value=500><br>
             <input type='submit'>
             </body></html>      
         """
@@ -174,16 +182,24 @@ class GetFileHandler(Resource):
         password = request.args['password'][0]
         file_id = request.args['fileID'][0]
         if self.cred.checkUser(user, password):
-            file = self.storage.getFile(file_id)
-            if file:
-                return file.read()
+            file_item = self.storage.getFile(file_id,zkitem=False, seek=False)
+            
+            if file_item:
+                file_data = file_item.read()
+                request.setHeader('Content-Type', 'Content-Type: text/plain')
+                request.responseHeaders.setRawHeaders('Content-Disposition', ['attachment; filename="%s"' % 
+                                                                                file_item.name])
+                return file_data
             request.setResponseCode(http.NOT_FOUND)
-            return "No File Found"
+            return "File not found"
+        request.setResponseCode(http.UNAUTHORIZED)    
+        return "Error: UserName or/and password invalid !?"
+    
     
     def render_GET(self, request):
         return """
-            <html><body>use post method to get a file directly or form below:<br><br>
-            <form action='/search' method=POST>
+            <html><body>use post method to get a file directly or use the form below:<br><br>
+            <form action='/getFile' method=POST>
             Admin    : <input type='text' name='user'><br>
             Password : <input type='password' name='password'><br>
             FileID : <input type='text' name='fileID'><br>
@@ -191,8 +207,96 @@ class GetFileHandler(Resource):
             </body></html>      
         """
     
+class ListSourceHandler(Resource):
     
+    def __init__(self, credential):
+        self.cred = credential
         
+    def render_POST(self, request):
+        user = request.args['user'][0]
+        password = request.args['password'][0]
+        if self.cred.checkUser(user, password):
+            items = self.cred.listSource()
+            request.setHeader('Content-Type', 'Content-Type: text/plain')
+            request.setHeader('charset', 'US-ASCII')
+            if items:
+                return  json.dumps(items, sort_keys = False, indent = 4)
+            else:
+                return '[]'
+        request.setResponseCode(http.UNAUTHORIZED)    
+        return "Error: UserName or/and password invalid !?"  
+    
+    def render_GET(self, request):
+        return """
+            <html><body>use post method to get the liste of declared sources or use the form below:<br><br>
+            <form action='/getSources' method=POST>
+            Admin    : <input type='text' name='user'><br>
+            Password : <input type='password' name='password'><br>
+            <input type='submit'>
+            </body></html>      
+        """
+   
+   
+class DeleteLogsHandler(Resource):
+    
+    def __init__(self, credential, storage, indexer):
+        self.cred = credential
+        self.storage = storage
+        self.indexer = indexer
+        
+    def render_POST(self, request):
+        user = request.args['user'][0]
+        password = request.args['password'][0]
+        query = request.args['query']       
+        if self.cred.checkUser(user, password):
+            propagate = False
+            if 'propagate' in request.args.keys():
+                propagate = True
+            print propagate
+            self.deleteLogs(query, propagate)
+            return 'ok'
+        
+        request.setResponseCode(http.UNAUTHORIZED)    
+        return "Error: UserName or/and password invalid !?"
+    
+    def render_GET(self, request):
+        return """
+            <html><body>use post method to delete a file directly or use the form below:<br><br>
+            <form action='/deleteLogs' method=POST>
+            Admin    : <input type='text' name='user'><br>
+            Password : <input type='password' name='password'><br>
+            query : <input type='text' name='query'><br>
+            Propagate to Data storage<INPUT type="checkbox" name="propagate" value="True">
+            <input type='submit'>
+            </body></html>"""
+     
+    def deleteLogs(self, query, propagate = False):
+        docs = self.indexer.search(query)
+        for doc in docs:
+            print doc
+            fileid = doc['fileid']
+            print "fileID", fileid
+            uuid = "uuid:%s" % doc['uuid']
+            self.indexer.delete_by_query(uuid)
+            self.storage.updateRemLines(fileid)
+            remLines = self.storage.getRemLines(fileid)
+            if propagate:
+                print "popagate"
+                if remLines and remLines == 0:
+                    self.storage.delete(fileid)
+                    
+        
+class PurgeStorageHandler(Resource):
+    
+    def __init__(self, storage):
+        self.storage = storage
+    
+    def render_POST(self,request):
+        pass
+    
+    def render_GET(self, request):
+        self.storage.purge()
+    
         
 class LogCollectHandler(Resource):
     
@@ -217,7 +321,7 @@ class LogCollectHandler(Resource):
         print postpath
         print request.path
         if len(postpath)!= 1 or postpath[0] == '': # if no giving key (postpath)
-            request.setResponseCode(LogCollectHandler.NO) # send code response NO
+            request.setResponseCode(Status.NO) # send code response NO
             return ""
         key = postpath[0]
         log.msg( "session: %s"% request.getSession().uid)
@@ -228,13 +332,13 @@ class LogCollectHandler(Resource):
             if code:
                 request.setResponseCode(int(code))
             else:
-                request.setResponseCode(LogCollectHandler.UNAVAILABLE)                
+                request.setResponseCode(Status.UNAVAILABLE)                
             try:	
                 request.finish()
             except:
 		pass
 	else:
-            request.setResponseCode(LogCollectHandler.NO)
+            request.setResponseCode(Status.NO)
             try:
                 request.finish()
             except:
@@ -261,7 +365,7 @@ def logProcess(request, producer, name):
         return code
     else:
         print "empty"
-        return LogCollectHandler.OK
+        return Status.OK
        
 
 class CredentialStore():
@@ -306,6 +410,16 @@ class CredentialStore():
             return True
         except:
             return False
+        
+    def listSource(self):
+        try:
+            sources = list(self.sources.find())
+            for item in sources:
+                del item['_id']
+            return sources
+        except:
+            return None
+            
 		
     def checkSource(self, key):
         source = self.sources.find_one({"key": key})

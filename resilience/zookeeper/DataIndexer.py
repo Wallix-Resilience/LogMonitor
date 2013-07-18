@@ -96,14 +96,20 @@ class SolrIndexer(object):
         return value
     
     
-    def search(self, query):
-        q = { 'q' : query}
+    def search(self, query, rows=500):
+        q = { 'q' : query, 'rows':rows}
         try:
             resp = self.solr.search(**q)
             return resp.documents
         except Exception, e:
             print e
             return []
+        
+    def delete_by_query(self, query):
+        try:
+            self.solr.delete_by_query(query)
+        except:
+            pass
     
     def commit(self):
         """

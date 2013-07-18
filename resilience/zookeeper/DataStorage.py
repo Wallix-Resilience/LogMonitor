@@ -10,7 +10,7 @@ import gridfs
 from resilience.zookeeper.configure.config import Config
 import uuid
 import time
-from resilience.twisted.server.httpsServer import LogCollectHandler as LogCollect
+from resilience.twisted.server.status import Status
 from twisted.python import log
 import bson
 
@@ -63,10 +63,10 @@ class MongoGridFs(object):
         file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))    
         try:
             fileDescriptor = self.mongofs.new_file(filename = file_name, machine = resource)
-            return (file_name, fileDescriptor, LogCollect.OK)
+            return (file_name, fileDescriptor, Status.OK)
         except Exception,e :
             print "unvailable:",e
-            return (None, None, LogCollect.UNAVAILABLE)
+            return (None, None, Status.UNAVAILABLE)
         
         
     def finalizeFile(self, fileDescriptor, filePath, linesAmount):
@@ -74,13 +74,17 @@ class MongoGridFs(object):
         try:
             self.db.fs.files.update({'_id':fileId},{"$set":{"lines":linesAmount, "remLines":linesAmount, "position":0}})
         except:
-            return (None, LogCollect.UNAVAILABLE)
+            return (None, Status.UNAVAILABLE)
         log.msg('Log chunk write on %s' % filePath)
-        return (str(fileId), LogCollect.OK)
+        return (str(fileId), Status.OK)
     
-    def getFile(self, item, seek=True):
+    def getFile(self, item, zkitem = True, seek=True):
         try:
-            fileId = bson.ObjectId(item.data)
+            if zkitem:
+                fileId = bson.ObjectId(item.data)
+            else:
+                fileId = bson.ObjectId(item)
+                
             fileItem = self.mongofs.get(fileId)
             result = self.db.fs.files.find_one({'_id':fileId}, {'position':1, '_id':0})
             position = result['position']
@@ -94,6 +98,26 @@ class MongoGridFs(object):
                 
     def saveCurrentPosition(self, fileItem):
         self.db.fs.files.update({'_id': fileItem._id},{"$set":{"position":fileItem.tell()}})
+    
+    def updateRemLines(self, fileId):
+        if type(fileId) != bson.objectid.ObjectId:
+            fileId = bson.ObjectId(fileId)
+        self.db.fs.files.update({'_id':bson.ObjectId(fileId)},{"$inc":{"remLines":-1}})
+        
+    def getRemLines(self, fileId):
+        if type(fileId) != bson.objectid.ObjectId:
+            fileId = bson.ObjectId(fileId)
+        res = self.db.fs.files.find_one({'_id':fileId})
+        return res['remLines']
+        
+    
+    def delete(self, fileId):
+        self.mongofs.delete(bson.ObjectId(fileId))
+    
+    def purge(self):
+        res = self.db.fs.files.find({"remLines": 0})
+        for r in res:
+            self.mongofs.delete(r["_id"])
     
     def _init_mongo(self,dbName):
         """Initialization of a MongoDB instance 

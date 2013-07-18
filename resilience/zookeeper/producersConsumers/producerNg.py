@@ -18,7 +18,7 @@ from txzookeeper.queue import ReliableQueue
 from twisted.internet import task
 import thread
 from resilience.twisted.server.httpsServer import initServerFactory
-from resilience.twisted.server.httpsServer import LogCollectHandler as LogCollect
+from resilience.twisted.server.status import Status
 from pymongo import Connection
 import gridfs
 from  pymongo.errors import AutoReconnect
@@ -107,7 +107,7 @@ class LogProducer():
         different function to process log lines
         @param logLine: logLine to proceed 
         @param name: name of the source collection 
-        @return: LogCollect.OK if producing succeeded 
+        @return: Status.OK if producing succeeded 
         """
         global LINE_PROD
         global FILE_PATH
@@ -116,30 +116,30 @@ class LogProducer():
         #TODO: verify if zookeeper is up
         self._check_timer(name)
         LINE_PROD[name] = LINE_PROD.get(name,0)
-        status = LogCollect.OK
+        status = Status.OK
         if LINE_PROD[name] == 0:
             try:
                 FILE_PATH[name], FILE_D[name], status = self.storage.newFile(name)
-                if not status == LogCollect.OK:
+                if not status == Status.OK:
                     return status
             except:
-                return LogCollect.UNAVAILABLE
+                return Status.UNAVAILABLE
             
         logLine = logLine.rstrip("\n") # to avoid blank lines on created file
         try:
             FILE_D[name].write('%s\n' % logLine)
         except:
-            return LogCollect.UNAVAILABLE
+            return Status.UNAVAILABLE
         LINE_PROD[name] += 1
         if LINE_PROD[name] == MAX_LINE:
             self.commit(name)
-        return LogCollect.OK
+        return Status.OK
         
     def commit(self,name):
         """Close file descriptor, stop timer of the source "name" and  call
         _gridfs_publish 
         @param  name: name of the source collection
-        @return: LogCollect.OK if operation succeed
+        @return: Status.OK if operation succeed
         """
         global FILE_D
         global FILE_PATH
@@ -160,7 +160,7 @@ class LogProducer():
         except:
             log.msg('Can not close file: %s' % FILE_PATH[name]) 
         fileid, status = self.storage.finalizeFile(fileDescriptor, filePath, linesAmount)
-        if status == LogCollect.OK:
+        if status == Status.OK:
             self.publish(fileid)
         return status 
         

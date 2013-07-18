@@ -66,7 +66,10 @@ def removeSource(args):
         print "Bad user or/and password"    
         
 def search(args):
-    data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query}
+    rows = 500
+    if args.rows:
+        rows = int(args.rows)
+    data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query, 'rows': args.rows}
     server = 'https://%s/%s' % (args.server, 'search')
     respcode , content = request(server, data)
     respcode = int(respcode)
@@ -124,20 +127,31 @@ def changePass(args):
     else:
         print "Error operation"
         
-
-def listSources(args):
-    pass
-
 def getFile(args):
-    pass
+    data = { 'user': getUser(args), 'password': getPassword(args), 'fileID': args.fileID}
+    server = 'https://%s/%s' % (args.server, 'getFile')
+    respcode , content = request(server, data)
+    respcode = int(respcode)
+    if respcode == http.OK:
+        print content
 
-def removeFiles(args):
+
+def getSources(args):
+    data = { 'user': getUser(args), 'password': getPassword(args)}
+    server = 'https://%s/%s' % (args.server, 'getSources')
+    respcode , content = request(server, data)
+    respcode = int(respcode)
+    if respcode == http.OK:
+        print content
+
+def removeFile(args):
     pass
 
 def removeLogs(args): 
-    pass
-        
-    
+    if args.propagate:
+        print "toto"
+
+
 def main():
     params = sys.argv[1:]
     parser = argparse.ArgumentParser(description='Resilient Log configuration client')
@@ -161,24 +175,29 @@ def main():
     #create the parser for the 'search' command
     parserSearch = subparsers.add_parser('search', help='search')
     parserSearch.add_argument('query')
+    parserSearch.add_argument('-r', '--rows', required=False)
     parserSearch.set_defaults(func=search)
     
-    
     #create the parser for the 'getFile' command
-    parserAddSource = subparsers.add_parser('getFile', help='get a file')
-    parserAddSource.add_argument('query', help='query')
+    parserGetFile = subparsers.add_parser('getFile', help='get a file')
+    parserGetFile.add_argument('fileID', help='get a log file')
+    parserGetFile.set_defaults(func=getFile)
     
     #create the parser for the 'removeFile' command
-    parserAddSource = subparsers.add_parser('removeFile', help='remove a file')
-    parserAddSource.add_argument('query')
+    parserRemoveFile = subparsers.add_parser('removeFile', help='remove a file')
+    parserRemoveFile.add_argument('query')
     
     #create the parser for the 'removeLog' command
-    parserAddSource = subparsers.add_parser('removeLog', help='remove a log Line')
-    parserAddSource.add_argument('query')
+    parserRemoveLog = subparsers.add_parser('removeLogs', help='remove log Lines from the index')
+    parserRemoveLog.add_argument('query')
+    parserRemoveLog.add_argument('-f', '--propagate', action="store_true", required=False, 
+                                                         help='remove also file')
+    parserRemoveLog.set_defaults(func=removeLogs)
     
-    #create the parser for the 'listSource' command
-    parserAddSource = subparsers.add_parser('listSource', help='list Sources')
- 
+    #create the parser for the 'getSources' command
+    parserListSources = subparsers.add_parser('getSources', help='list Sources')
+    parserListSources.set_defaults(func=getSources)
+    
     #create the parser for the 'changePass' command
     parserAddSource = subparsers.add_parser('changePass', help='change the admin Password')
     parserAddSource.set_defaults(func=changePass)
@@ -189,10 +208,4 @@ def main():
     args.func(args)
 
 if __name__ == '__main__':
-    main()
-        
-         
-   
-    
-
-    
+    main()   
