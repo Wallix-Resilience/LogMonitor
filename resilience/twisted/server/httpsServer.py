@@ -40,6 +40,8 @@ class RootResource(Resource):
         self.putChild('getFile', GetFileHandler(credentialStore, storage))
         self.putChild('getSources', ListSourceHandler(credentialStore))
         self.putChild('deleteLogs', DeleteLogsHandler(credentialStore, storage, indexer))
+        self.putChild('deleteFile', DeleteFileHandler(credentialStore, storage, indexer))        
+        DeleteFileHandler
         self.putChild('purge', PurgeStorageHandler(storage))
         
 class RegisterHandler(Resource):
@@ -261,7 +263,7 @@ class DeleteLogsHandler(Resource):
     
     def render_GET(self, request):
         return """
-            <html><body>use post method to delete a file directly or use the form below:<br><br>
+            <html><body>use post method to delete logs directly or use the form below:<br><br>
             <form action='/deleteLogs' method=POST>
             Admin    : <input type='text' name='user'><br>
             Password : <input type='password' name='password'><br>
@@ -281,18 +283,62 @@ class DeleteLogsHandler(Resource):
             self.storage.updateRemLines(fileid)
             remLines = self.storage.getRemLines(fileid)
             if propagate:
-                print "popagate"
-                if remLines and remLines == 0:
+                print "popagate: ", remLines
+                if remLines == 0:
+                    print "delete"
                     self.storage.delete(fileid)
                     
+                    
+class DeleteFileHandler(Resource):
+    
+    def __init__(self, credential, storage, indexer):
+        self.cred = credential
+        self.storage = storage
+        self.indexer = indexer
         
+    def render_POST(self, request):
+        user = request.args['user'][0]
+        password = request.args['password'][0]
+        fileid = request.args['fileid'][0]     
+        if self.cred.checkUser(user, password):
+            propagate = False
+            if 'propagate' in request.args.keys():
+                propagate = True
+            print propagate
+            self.deleteFile(fileid, propagate)
+            return 'ok'
+        
+        request.setResponseCode(http.UNAUTHORIZED)    
+        return "Error: UserName or/and password invalid !?"
+    
+    def render_GET(self, request):
+        return """
+            <html><body>use post method to delete a file directly or use the form below:<br><br>
+            <form action='/deleteLogs' method=POST>
+            Admin    : <input type='text' name='user'><br>
+            Password : <input type='password' name='password'><br>
+            fileID : <input type='text' name='fileid'><br>
+            Propagate to Data storage<INPUT type="checkbox" name="propagate" value="True">
+            <input type='submit'>
+            </body></html>"""
+     
+    def deleteFile(self, fileid, propagate = False):
+        self.storage.delete(fileid)
+        if propagate:
+                query = "fileid:%s" % fileid
+                self.indexer.delete_by_query(query)
+                                       
+                    
 class PurgeStorageHandler(Resource):
     
     def __init__(self, storage):
         self.storage = storage
     
     def render_POST(self,request):
-        pass
+        user = request.args['user'][0]
+        password = request.args['password'][0]
+        if self.cred.checkUser(user, password):
+            self.storage.purge()
     
     def render_GET(self, request):
         self.storage.purge()

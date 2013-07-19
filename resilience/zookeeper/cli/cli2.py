@@ -69,7 +69,7 @@ def search(args):
     rows = 500
     if args.rows:
         rows = int(args.rows)
-    data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query, 'rows': args.rows}
+    data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query, 'rows': rows}
     server = 'https://%s/%s' % (args.server, 'search')
     respcode , content = request(server, data)
     respcode = int(respcode)
@@ -144,12 +144,43 @@ def getSources(args):
     if respcode == http.OK:
         print content
 
-def removeFile(args):
-    pass
 
-def removeLogs(args): 
+def purgeStorage(args):
+    data = { 'user': getUser(args), 'password': getPassword(args)}
+    server = 'https://%s/%s' % (args.server, 'purgeStorage')
+    respcode , content = request(server, data)
+    respcode = int(respcode)
+    if respcode == http.OK:
+        print content
+        
+def removeFile(args):
+    data = { 'user': getUser(args), 'password': getPassword(args), 'fileid': args.fileid}
+    server = 'https://%s/%s' % (args.server, 'deleteFile')
     if args.propagate:
-        print "toto"
+        data['propagate'] = 'True'
+    respcode , content = request(server, data)
+    respcode = int(respcode)
+    if respcode == http.OK:
+        print "File were removed"
+    elif respcode == http.BAD_REQUEST:
+        print "Erro will removing %Logs"
+    elif respcode == http.UNAUTHORIZED:
+        print "Bad user or/and password"  
+
+
+def removeLogs(args):
+    data = { 'user': getUser(args), 'password': getPassword(args), 'query': args.query}
+    server = 'https://%s/%s' % (args.server, 'deleteLogs')
+    if args.propagate:
+        data['propagate'] = 'True'
+    respcode , content = request(server, data)
+    respcode = int(respcode)
+    if respcode == http.OK:
+        print "Logs were removed"
+    elif respcode == http.BAD_REQUEST:
+        print "Erro will removing %Logs"
+    elif respcode == http.UNAUTHORIZED:
+        print "Bad user or/and password"  
 
 
 def main():
@@ -183,17 +214,24 @@ def main():
     parserGetFile.add_argument('fileID', help='get a log file')
     parserGetFile.set_defaults(func=getFile)
     
-    #create the parser for the 'removeFile' command
-    parserRemoveFile = subparsers.add_parser('removeFile', help='remove a file')
-    parserRemoveFile.add_argument('query')
+    #create the parser for the 'deleteFile' command
+    parserRemoveFile = subparsers.add_parser('deleteFile', help='remove a file')
+    parserRemoveFile.add_argument('fileid')
+    parserRemoveFile.add_argument('-f', '--propagate', action="store_true", required=False, 
+                                                         help='remove also file')
+    parserRemoveFile.set_defaults(func=removeFile)
     
-    #create the parser for the 'removeLog' command
-    parserRemoveLog = subparsers.add_parser('removeLogs', help='remove log Lines from the index')
+    #create the parser for the 'deleteLogs' command
+    parserRemoveLog = subparsers.add_parser('deleteLogs', help='remove log Lines from the index')
     parserRemoveLog.add_argument('query')
     parserRemoveLog.add_argument('-f', '--propagate', action="store_true", required=False, 
                                                          help='remove also file')
     parserRemoveLog.set_defaults(func=removeLogs)
     
+    #create the parser for the 'purgeStorafge' command
+    parserPurge = subparsers.add_parser('purgeStorage', help='remove Files with no line indexer')
+    parserPurge.set_defaults(func=removeLogs)
+
     #create the parser for the 'getSources' command
     parserListSources = subparsers.add_parser('getSources', help='list Sources')
     parserListSources.set_defaults(func=getSources)
