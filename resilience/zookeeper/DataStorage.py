@@ -137,9 +137,7 @@ class MongoGridFs(object):
                 print "mongodb:", e
                 #time.sleep(2)
                 reactor.callLater(2, _connect, mongoAdd, mongoPort, limit)#TODO: test callLater
-                #to not reach python's recursion limit - 100
-                #if limit < (sys.getrecursionlimit() - 100):
-                #   _connect(mongoAdd, mongoPort, limit+1)
+     
                 
         def _call(m):
             """Retrieve MonogDB configuration from Zookeeper
