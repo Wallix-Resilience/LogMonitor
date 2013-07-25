@@ -24,7 +24,7 @@ import gridfs
 from  pymongo.errors import AutoReconnect
 import argparse
 from resilience.zookeeper.configure.config import Config
-from resilience.zookeeper.DataStorage import MongoGridFs
+from resilience.data.DataStorage import MongoGridFs
 log.startLogging(sys.stdout)
 
 

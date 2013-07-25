@@ -13,8 +13,9 @@ setup(name='ResilientLog',
                   'resilience.twisted',
                   'resilience.twisted.agent',
                   'resilience.twisted.server',
-                  'resilience.zookeeper.cli',
-                  'resilience.execute'],      
+                  'resilience.cli',
+                  'resilience.bootstrap',
+                  'resilience.data'],      
       package_data={'resilience': ['conffiles/*']},
       requires=['pylogsparser','solrpy','mysolr','pymongo'],
       entry_points = {        
@@ -22,11 +23,11 @@ setup(name='ResilientLog',
             'producer = resilience.zookeeper.producersConsumers.producerNg:main',
             'consumer = resilience.zookeeper.producersConsumers.consumerNg:main',
             'collectAgent = resilience.twisted.agent.httpsAgent:main',
-            'solr = resilience.execute.solr:main',
-            'mongo = resilience.execute.mongo:main',
-            'mongoshardinit = resilience.execute.mongo:initsharding',
-            'mongoaddshards = resilience.execute.mongo:addshards',
-            'cli = resilience.zookeeper.cli.cli2:main'
+            'solr = resilience.bootstrap.solr:main',
+            'mongo = resilience.bootstrap.mongo:main',
+            'mongoshardinit = resilience.bootstrap.mongo:initsharding',
+            'mongoaddshards = resilience.bootstrap.mongo:addshards',
+            'cli = resilience.cli.cli:main'
         ],
       }
 )

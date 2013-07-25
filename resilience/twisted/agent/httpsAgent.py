@@ -17,18 +17,14 @@ import socket
 import signal
 from atexit import _exithandlers
 import argparse
-
-
-KEY = "552990110b6e6e008378bf9953b191aeaaf3156e82964d37886b959934396481"
-SERVER_ADDR = "https://localhost:8991/send/%s" % KEY
-#SERVER_ADDR = "https://[2001:470:1f14:169:c00d:4cff:fed4:4894]:9983/%s" % KEY
-#SERVER_ADDR = "https://[fd88:9fde:bd6e:f57a:ad39:fd7b:9dea:615]:9983/%s" % KEY
+import getpass
+from urlparse import urljoin
 
 class logAgent():
     """
     This class represent an example of an HTTPS agent 
     """
-    def __init__(self, directory, server):
+    def __init__(self, directory, server, key):
         """
         Initialization of a log Collection agent
         
@@ -38,7 +34,7 @@ class logAgent():
         @param AgentKey: 
         @param AgentCertificat: 
         """
-        self.server = server
+        self.server = urljoin('https://%s' % server, 'send/%s' % key)
         self.http = httplib2.Http(disable_ssl_certificate_validation=True)
         self.lw = LogWatcher(directory,self.sendLine)
         signal.signal(signal.SIGTERM, self._exitHandler)
@@ -98,14 +94,14 @@ def main():
     
     params = sys.argv[1:]
     parser = argparse.ArgumentParser(description='An https log agent collector')
-    parser.add_argument('-s','--server',help='address of the collect server', 
-                                          default=SERVER_ADDR, required=False)
-    parser.add_argument('-d','--dir',help='directory to watch', 
-                                          default="/tmp/log/", required=False)
+    parser.add_argument('-s','--server',help='address of the collect server', required=True)
+    parser.add_argument('-d','--dir',help='directory to watch', required=True)
     args = parser.parse_args(params) 
     serverAddr = args.server
     dirToWatch = args.dir
-    logA = logAgent(dirToWatch, serverAddr)
+    key = getpass.getpass("Enter your Key: ")
+    print key
+    logA = logAgent(dirToWatch, serverAddr, key)
     logA.run()
     
     

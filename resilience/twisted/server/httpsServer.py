@@ -19,13 +19,13 @@ from  pymongo.errors import AutoReconnect
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto import Random
-from resilience.zookeeper.DataIndexer import SolrIndexer
+from resilience.data.DataIndexer import SolrIndexer
 from OpenSSL import crypto, SSL
 from socket import gethostname
 from os.path import exists, join
 from twisted.internet import ssl
 import simplejson as json
-from resilience.zookeeper.DataStorage import MongoGridFs
+from resilience.data.DataStorage import MongoGridFs
 from resilience.twisted.server.status import Status
 log.startLogging(sys.stdout)
 

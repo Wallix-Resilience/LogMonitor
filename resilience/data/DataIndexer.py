@@ -52,6 +52,7 @@ class SolrIndexer(object):
                 data[key] = self._utc_to_string(value)
         try:
             print "json:", data
+            print self.solr
             self.solr.update([data],commit=False)
             return True
         except Exception, e:

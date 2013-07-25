@@ -15,8 +15,8 @@ from twisted.internet import task
 import argparse
 from  pymongo.errors import AutoReconnect
 from datetime import datetime, timedelta, tzinfo
-from resilience.zookeeper.DataStorage import MongoGridFs
-from resilience.zookeeper.DataIndexer import SolrIndexer
+from resilience.data.DataStorage import MongoGridFs
+from resilience.data.DataIndexer import SolrIndexer
 
 log.startLogging(open('./consumer', 'w'))
 
@@ -160,11 +160,9 @@ def cb_connected(useless, zc, normalizer):
     zcrq = ReliableQueue(znode_path, zc, persistent = True)
     #d.addCallback(lambda x: log.msg('Queue znode created at %s' % znode_path))
     #d.addErrback(_err)
-    
-    configuration = Config(zc)
-    
-    storage = MongoGridFs("resilience21", configuration, reactor)
-    indexer = SolrIndexer(configuration)
+        
+    storage = MongoGridFs("resilience21", Config(zc), reactor)
+    indexer = SolrIndexer(Config(zc))
     
     lc = LogConsumer(znode_path, zc, zcrq, storage, indexer, normalizer)
     lc.consume()

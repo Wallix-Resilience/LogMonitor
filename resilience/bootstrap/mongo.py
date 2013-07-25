@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# coding=utf-8
 '''
 Wallix
 
@@ -16,6 +17,7 @@ import argparse
 import signal
 from pymongo import Connection
 from pymongo.errors import AutoReconnect
+from pymongo.errors import OperationFailure
 from time import sleep
 
 log.startLogging(sys.stdout)
@@ -39,14 +41,18 @@ def addshards():
         try:
             conn = Connection(host, port)
             for shard in shards:
-                conn.admin.command("addshard", shard)
+                try:
+                    conn.admin.command("addshard", shard)
+                except OperationFailure, e:
+                    print e
             break
         except AutoReconnect:
             sleep(1)
 
     print "*** READY ***"
     print
-    reactor.stop()
+    if reactor.running:
+        reactor.stop()
     
 def initsharding():    
     params = sys.argv[1:]    
