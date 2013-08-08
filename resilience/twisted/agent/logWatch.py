@@ -1,10 +1,4 @@
 #!/usr/bin/env python
-'''
-Wallix
-
-@author: Lahoucine BENLAHMR
-@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
-'''
 import os
 import time
 import errno

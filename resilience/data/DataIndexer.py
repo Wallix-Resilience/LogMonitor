@@ -1,9 +1,3 @@
-'''
-Created on 3 juil. 2013
-
-@author: lahoucine
-'''
-
 from zope.interface import Interface, implements
 from twisted.python import log
 from datetime import datetime, timedelta, tzinfo

@@ -183,11 +183,14 @@ def main():
     
     zkAddr = args.zkServer
     normalizer = args.normalizer
-    
-    zc = RetryClient(ZookeeperClient(zkAddr))
-    d = zc.connect()
-    d.addCallback(cb_connected, zc, normalizer)
-    d.addErrback(log.msg)
+    try:
+        zc = RetryClient(ZookeeperClient(zkAddr))
+        d = zc.connect()
+        d.addCallback(cb_connected, zc, normalizer)
+        d.addErrback(log.msg)
+    except:
+        print "Can't connect to Zookeeper"
+        return
     
     reactor.run()
     

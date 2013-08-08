@@ -1,10 +1,4 @@
 #!/usr/bin/python
-'''
-Wallix
-
-@author: Lahoucine BENLAHMR
-@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
-'''
 from txzookeeper.client import ZookeeperClient
 from txzookeeper.retry import RetryClient
 import zookeeper

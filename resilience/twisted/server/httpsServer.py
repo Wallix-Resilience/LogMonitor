@@ -1,10 +1,5 @@
 #!/usr/bin/python
-'''
-Wallix
 
-@author: Lahoucine BENLAHMR
-@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
-'''
 import sys
 from twisted.web import http
 from twisted.web.server import Site
@@ -41,9 +36,21 @@ class RootResource(Resource):
         self.putChild('getSources', ListSourceHandler(credentialStore))
         self.putChild('deleteLogs', DeleteLogsHandler(credentialStore, storage, indexer))
         self.putChild('deleteFile', DeleteFileHandler(credentialStore, storage, indexer))        
-        DeleteFileHandler
         self.putChild('purge', PurgeStorageHandler(storage))
         
+    def getChild(self, name, request):
+        if name == '':
+            return self
+        return Resource.getChild(self, name, request)
+    
+    def render_GET(self, request):
+        names = self.listNames()
+        body = """<html><body>"""
+        for n in names:
+            body+= "<a href='%s'>%s</a></br>" % (n, n)
+        body+="""</body></html> """
+        return body
+    
 class RegisterHandler(Resource):
 	
     def __init__(self, credentialStore):
@@ -54,9 +61,10 @@ class RegisterHandler(Resource):
         user = request.args['user'][0]
         password = request.args['password'][0]
         sourceName = request.args['source'][0]
+        ip = request.args['ip'][0]
         print self.cred.checkUser(user, password)
         if self.cred.checkUser(user, password):
-            rep =  self.cred.addSource(sourceName)
+            rep =  self.cred.addSource(sourceName, ip)
             if not rep:
                 request.setResponseCode(http.CONFLICT)
                 return ""
@@ -72,6 +80,7 @@ class RegisterHandler(Resource):
             Admin    : <input type='text' name='user'><br>
             Password : <input type='password' name='password'><br>
             Source name to add : <input type='text' name='source'><br>
+            Source IP : <input type='text' name='ip'><br>
             <input type='submit'>
             </body></html>      
         """
@@ -370,9 +379,11 @@ class LogCollectHandler(Resource):
             request.setResponseCode(Status.NO) # send code response NO
             return ""
         key = postpath[0]
+        ip = request.getClientIP()
+        print "ip",ip
         log.msg( "session: %s"% request.getSession().uid)
         #startTime = time()
-        sourceName = self.cred.checkSource(key)
+        sourceName = self.cred.checkSource(key, ip)
         if sourceName:
             code = logProcess(request, self.prod, sourceName)
             if code:
@@ -436,13 +447,13 @@ class CredentialStore():
         except:
             return False
 
-    def addSource(self, name):
+    def addSource(self, name, ip):
         key = self._key_generator()
         exists = self.sources.find_one({"name": name}, {"name": 1})
         print exists
         if not exists :
             try :
-                source = { "name" : name, "key": key }
+                source = { "name" : name, "ip": ip, "key": key }
                 self.sources.insert(source)
                 return key
             except:
@@ -467,8 +478,8 @@ class CredentialStore():
             return None
             
 		
-    def checkSource(self, key):
-        source = self.sources.find_one({"key": key})
+    def checkSource(self, key, ip):
+        source = self.sources.find_one({"key": key, "ip": ip})
         print "check source", key
         if source:
             print source

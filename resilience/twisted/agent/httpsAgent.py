@@ -1,10 +1,5 @@
 #!/usr/bin/env python
-'''
-Wallix
 
-@author: Lahoucine BENLAHMR
-@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
-'''
 import httplib2
 from resilience.twisted.agent.logWatch import LogWatcher
 #

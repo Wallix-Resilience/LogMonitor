@@ -1,11 +1,6 @@
-'''
-Created on 1 juil. 2013
-
-@author: lahoucine
-'''
 from zope.interface import Interface, implements
 from pymongo import Connection
-from  pymongo.errors import AutoReconnect
+from  pymongo.errors import AutoReconnect, OperationFailure
 import gridfs
 from resilience.zookeeper.configure.config import Config
 import uuid
@@ -13,6 +8,7 @@ import time
 from resilience.twisted.server.status import Status
 from twisted.python import log
 import bson
+import sys
 
 class IFileStorage(Interface):
     '''
@@ -52,13 +48,15 @@ class MongoGridFs(object):
     implements(IFileStorage)
     
     
-    def __init__(self, dbName, conf, reactor):
+    def __init__(self, dbName, conf, reactor, user=None, password=None):
         self.conf = conf
         self.db = None    
         self.mongofs = None
         self._init_mongo(dbName)
         self.reactor = reactor
-                
+        self.user = user
+        self.password = password
+        
     def newFile(self, resource):
         file_name = 'log%s_%s.log' % (str(uuid.uuid4()), int(time.time()))    
         try:
@@ -130,13 +128,30 @@ class MongoGridFs(object):
             """
             try:
                 connection = Connection(mongoAdd, int(mongoPort))
-                self.db = connection[dbName]    
-                self.mongofs = gridfs.GridFS(self.db)
+                self.db = connection[dbName]
+                if self.user and self.password:
+                    try:
+                        adminDB = connection['admin']
+                        adminDB.add_user(self.user, self.password)
+                    except:
+                        pass
+                    try:
+                        self.db.authenticate(self.user, self.password)
+                    except:
+                        print "authentification to mognodb failed"
+                try:
+                    self.mongofs = gridfs.GridFS(self.db)
+                except OperationFailure, e:
+                    print "mongodb:", e
+                    print "Please retry later!"
+                    if self.reactor.running:
+                         self.reactor.stop()
+                    
+                        
                 print "connected to mongodb: %s:%s" %  (mongoAdd, mongoPort)
             except AutoReconnect, e:
                 print "mongodb:", e
-                #time.sleep(2)
-                reactor.callLater(2, _connect, mongoAdd, mongoPort, limit)#TODO: test callLater
+                self.reactor.callLater(2, _connect, mongoAdd, mongoPort, limit)#TODO: test callLater
      
                 
         def _call(m):

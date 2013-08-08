@@ -1,11 +1,5 @@
 #!/usr/bin/python
 # coding=utf-8
-'''
-Wallix
-
-@author: Lahoucine BENLAHMR
-@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
-'''
 from txzookeeper.client import ZookeeperClient
 from txzookeeper.retry import RetryClient
 import zookeeper
@@ -27,8 +21,8 @@ def addshards():
     params = sys.argv[1:]    
     parser = argparse.ArgumentParser(description='add shards into mongodb cluster')
     parser.add_argument('-s','--shards',help='list of shards', nargs='+', required=True)
-    parser.add_argument('-i','--bind_ip',help='binding ip', required=True)
-    parser.add_argument('-p','--port',help='listening port', required=True)
+    parser.add_argument('-i','--bind_ip',help='mongos binding ip', required=True)
+    parser.add_argument('-p','--port',help='mongos listening port', required=True)
     args = parser.parse_args(params)
 
     shards = args.shards
@@ -42,6 +36,7 @@ def addshards():
             conn = Connection(host, port)
             for shard in shards:
                 try:
+                    print "Adding shard: %s" % shard
                     conn.admin.command("addshard", shard)
                 except OperationFailure, e:
                     print e
@@ -80,16 +75,23 @@ def initsharding():
     sleep(10)
     while (True):
         try:
-            conn = Connection(host, port) 
-            conn.admin.command("replSetInitiate", config)
-            print conn.admin.command("replSetGetStatus")
+            conn = Connection(host, port)
+            try:
+                conn.admin.command("replSetInitiate", config)
+                print conn.admin.command("replSetGetStatus")
+            except OperationFailure, e:
+                print "mongodb: ", e
+                break
+            print "*** READY ***"
+            print
             break
         except AutoReconnect:
+            print "Mongodb can't connect to  %s in %s" % (str(port), host)
+            print "Trying again!"
             sleep(1)
-
-    print "*** READY ***"
-    print
-    reactor.stop()
+            
+    if reactor.running:
+        reactor.stop()
     
 
 
@@ -122,7 +124,8 @@ def cb_connected(self, zc, mongod, ip, port, conf):
         p = subprocess.Popen(arguments)
         #subprocess.call(arguments)
     except:
-        reactor.stop()
+        if reactor.running:
+            reactor.stop()
         
     signal.signal(signal.SIGTERM, handler)
     p.wait()
@@ -131,7 +134,8 @@ def handler(signum, frame):
     global p
     "terminate process %s ..." % p.pid
     p.terminate()
-    reactor.stop()
+    if reactor.running:
+        reactor.stop()
     
 def main():
     """
@@ -157,11 +161,14 @@ def main():
     conf = args.config
     ip = args.bind_ip
     port = args.port
-        
-    zc = RetryClient(ZookeeperClient(zk))
-    d = zc.connect()
-    d.addCallback(cb_connected, zc, mongod, ip, port, conf)
-    d.addErrback(log.msg)
+    try:    
+        zc = RetryClient(ZookeeperClient(zk))
+        d = zc.connect()
+        d.addCallback(cb_connected, zc, mongod, ip, port, conf)
+        d.addErrback(log.msg)
+    except:
+        print "Can't connect to zookeeper!"
+        return
     reactor.run()
 
 if __name__ == "__main__":

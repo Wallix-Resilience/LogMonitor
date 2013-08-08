@@ -1,10 +1,5 @@
 #!/usr/bin/python
-'''
-Wallix
 
-@author: Lahoucine BENLAHMR
-@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
-'''
 from OpenSSL import SSL
 import sys
 import os
@@ -209,11 +204,11 @@ def main():
     parser = argparse.ArgumentParser(description='Log producer with embedded https server ')
     parser.add_argument('-z','--zkServer',help='address of the zookeeper server', 
                                           default="localhost:2181", required=True)
-    parser.add_argument('-a','--host',help='the hostname to bind to, defaults to localhost', 
+    parser.add_argument('-a','--host',help='the hostname/ip to bind to, defaults to localhost', 
                                           default="localhost", required = False)
     parser.add_argument('-p','--port',help='the port to listen in', type=int, 
                                           default="8991", required=False)
-    parser.add_argument('-c','--certDir',help='the  certificat and key diretory', 
+    parser.add_argument('-c','--certDir',help='the directory to store https  certificat and key', 
                                           default="/tmp/", required=False)
     
     args = parser.parse_args(params)
@@ -221,11 +216,15 @@ def main():
     host = args.host
     port = args.port
     certDir = args.certDir
-    
-    zc = RetryClient(ZookeeperClient(zkAddr))
-    d = zc.connect()
-    d.addCallback(cb_connected, zc, host, port, certDir)
-    d.addErrback(log.msg)
+    try:
+        zc = RetryClient(ZookeeperClient(zkAddr))
+        d = zc.connect()
+        d.addCallback(cb_connected, zc, host, port, certDir)
+        d.addErrback(log.msg)
+    except:
+        print "Can't connect to Zookeeper!"
+        return
+        
     reactor.run()
     
    

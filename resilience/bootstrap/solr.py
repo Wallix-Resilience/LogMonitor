@@ -1,10 +1,5 @@
 #!/usr/bin/python
-'''
-Wallix
 
-@author: Lahoucine BENLAHMR
-@contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
-'''
 from txzookeeper.client import ZookeeperClient
 from txzookeeper.retry import RetryClient
 import zookeeper
@@ -108,11 +103,14 @@ def main():
     ip = args.ip
     java = args.java
     numsh = args.numshard
-        
-    zc = RetryClient(ZookeeperClient(zk))
-    d = zc.connect()
-    d.addCallback(cb_connected, zc, cores, solrpath, solrhome, numsh, port, ip, java, zk)
-    d.addErrback(log.msg)
+    try:  
+        zc = RetryClient(ZookeeperClient(zk))
+        d = zc.connect()
+        d.addCallback(cb_connected, zc, cores, solrpath, solrhome, numsh, port, ip, java, zk)
+        d.addErrback(log.msg)
+    except:
+        print "Can't connect to Zokeeper!"
+        return
     reactor.run()
 
 if __name__ == "__main__":

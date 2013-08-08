@@ -1,9 +1,5 @@
 #!/usr/bin/env python
-'''
-Created on 9 janv. 2013
 
-@author: lahoucine
-'''
 import argparse
 import sys
 import httplib2
@@ -42,7 +38,7 @@ def getPassword(args):
         return args.password
 
 def addSource(args): 
-    data = { 'user': getUser(args), 'password': getPassword(args), 'source': args.sourceName}
+    data = { 'user': getUser(args), 'password': getPassword(args), 'source': args.sourceName, 'ip' : args.sourceIP}
     server = "https://%s/%s" % (args.server, "register")
     respcode , content = request(server, data)
     respcode = int(respcode)
@@ -185,55 +181,56 @@ def removeLogs(args):
 
 def main():
     params = sys.argv[1:]
-    parser = argparse.ArgumentParser(description='Resilient Log configuration client')
+    parser = argparse.ArgumentParser(description='LogMonitor configuration client')
     
-    parser.add_argument('-s','--server',help='address of the producer server', 
+    parser.add_argument('-s','--server',help='address of the producer/collector server', 
                                           default="localhost:8991")
     parser.add_argument('-u', '--user', help='Administrator user name')
     parser.add_argument('-p', '--password', help='Administrator password')
     subparsers = parser.add_subparsers(help='sub-command help')
     
     #create the parser for the 'addSource' command
-    parserAddSource = subparsers.add_parser('addSource', help='add Source')
+    parserAddSource = subparsers.add_parser('addSource', help='add a source of log collection to the authorisation list')
     parserAddSource.add_argument('sourceName')
+    parserAddSource.add_argument('sourceIP')
     parserAddSource.set_defaults(func=addSource)
     
     #create the parser for the 'removeSource' command
-    parserRmSource = subparsers.add_parser('removeSource', help='remove Source')
+    parserRmSource = subparsers.add_parser('deleteSource', help='remove a source of log collection from the authorisation list')
     parserRmSource.add_argument('sourceName')
     parserRmSource.set_defaults(func=removeSource)
     
     #create the parser for the 'search' command
-    parserSearch = subparsers.add_parser('search', help='search')
+    parserSearch = subparsers.add_parser('search', help='make a search query')
     parserSearch.add_argument('query')
     parserSearch.add_argument('-r', '--rows', required=False)
     parserSearch.set_defaults(func=search)
     
     #create the parser for the 'getFile' command
-    parserGetFile = subparsers.add_parser('getFile', help='get a file')
+    parserGetFile = subparsers.add_parser('getFile', help='get a log file from the storage')
     parserGetFile.add_argument('fileID', help='get a log file')
     parserGetFile.set_defaults(func=getFile)
     
     #create the parser for the 'deleteFile' command
-    parserRemoveFile = subparsers.add_parser('deleteFile', help='remove a file')
+    parserRemoveFile = subparsers.add_parser('deleteFile', help='remove a file from the file storage')
     parserRemoveFile.add_argument('fileid')
     parserRemoveFile.add_argument('-f', '--propagate', action="store_true", required=False, 
-                                                         help='remove also file')
+                                                         help='remove also file\'s logs lines from the index storage')
     parserRemoveFile.set_defaults(func=removeFile)
     
     #create the parser for the 'deleteLogs' command
-    parserRemoveLog = subparsers.add_parser('deleteLogs', help='remove log Lines from the index')
+    parserRemoveLog = subparsers.add_parser('deleteLogs', help='remove log Lines from the index storage')
     parserRemoveLog.add_argument('query')
     parserRemoveLog.add_argument('-f', '--propagate', action="store_true", required=False, 
-                                                         help='remove also file')
+                                                         help='remove also the file referenced by the log lines if not referenced anymore')
     parserRemoveLog.set_defaults(func=removeLogs)
     
     #create the parser for the 'purgeStorafge' command
-    parserPurge = subparsers.add_parser('purgeStorage', help='remove Files with no line indexer')
+    parserPurge = subparsers.add_parser('purgeStorage', help='remove Files not referenced in the index storage')
     parserPurge.set_defaults(func=removeLogs)
 
     #create the parser for the 'getSources' command
-    parserListSources = subparsers.add_parser('getSources', help='list Sources')
+    parserListSources = subparsers.add_parser('getSources', help='list Sources in the authorisation list')
     parserListSources.set_defaults(func=getSources)
     
     #create the parser for the 'changePass' command
