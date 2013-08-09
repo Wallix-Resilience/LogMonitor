@@ -133,9 +133,12 @@ def cb_connected(self, zc, mongod, ip, port, conf):
 def handler(signum, frame):
     global p
     "terminate process %s ..." % p.pid
-    p.terminate()
-    if reactor.running:
-        reactor.stop()
+    try:
+        p.terminate()
+        if reactor.running:
+            reactor.stop()
+    except:
+        print "No such process or not killed!"
     
 def main():
     """

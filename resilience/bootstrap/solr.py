@@ -68,8 +68,11 @@ def cb_connected(self, zc, cores, solrpath, solrhome, numsh, port, ip, java, zk)
 
 def handler(signum, frame):
     global p
-    "terminate process %s ..." % p.pid
-    p.terminate()
+    try:
+        p.terminate()
+        "terminate process %s ..." % p.pid
+    except:
+        print "No such process or not killed"
     
       
 def main():

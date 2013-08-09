@@ -201,7 +201,7 @@ def main():
     parserRmSource.set_defaults(func=removeSource)
     
     #create the parser for the 'search' command
-    parserSearch = subparsers.add_parser('search', help='make a search query')
+    parserSearch = subparsers.add_parser('search', help='make a search query using the lucen query language: http://lucene.apache.org/core/2_9_4/queryparsersyntax.html')
     parserSearch.add_argument('query')
     parserSearch.add_argument('-r', '--rows', required=False)
     parserSearch.set_defaults(func=search)

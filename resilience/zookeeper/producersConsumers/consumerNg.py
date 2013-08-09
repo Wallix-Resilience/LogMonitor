@@ -66,7 +66,7 @@ class LogConsumer():
             except:
                 log.msg("Can't requeue item %s" % item.data)
             
-        def _consuming(item):
+        def _consumItem(item):
             """
             start consuming: open the file referenced by the task
             and Initialize a timer for commits in solr.
