@@ -4,25 +4,36 @@ LOG COLLECTION FOR THE CLOUD
 Infos:
 ------
 Author: Lahoucine BENLAHMR
-Contact: lbenlahmr@wallix.com ben.lahoucine@gmail.com
+Contact: lbenlahmr@wallix.com
 Company: Wallix
 
 
 Description:
 ------------
-this software is a distributed and fault tolerant log collection for the Cloud
+this software is a distributed and fault tolerant log collection for Cloud
+
+requirements:
+------------
+
+- Apache Solr
+- Apache Zookeeper
+- Mongodb
 
 How to:
 -------
--to work its need an instance of zookeeper.
--after starting an instance of zookeeper server, we can run producers 
-and consumers:
+1. Start zookeeper
+2. Start and register mongodb and Solr in Zookeeper using the bootstrap script mongo.py and solr.py
+4. To start an instance of producer use producerNg.py
+5. To start an instance of consumer use consumerNg.py
+6. use the CLI script to communicat with the log collector an do the following operations:
+   - add a new source of log collect
+   - remove a source of log collect
+   - make a search query in the indexed logs
+   - remove logs
+   - get a log file
+   - remove a log file
+   - get a list of declared sources
+   - change the admin password
+   - purge index and storage
+7. to send logs after the declarion of the collection source. use httpsAgent to watch a directory and send logs 
 
- -to start a producer: execute resilience/zookeeper/producersConsumers/producerNg.py
- -to start a consumer: execute resilience/zookeeper/producersConsumers/consumerNg.py
-
- - to register a machine use : resilience/zookeeper/configure/config.py
- - to start a Collection agent use: resilience/twisted/httpsAgent.py
- - to remove indexes and files use: resilience/tools/tools.py
- - to start an instance of mongoDB use: resilience/execute/mongo.py
- - to start an instance of solr use: resilience/execute/solr.py
