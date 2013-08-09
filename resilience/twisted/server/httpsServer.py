@@ -22,6 +22,7 @@ from twisted.internet import ssl
 import simplejson as json
 from resilience.data.DataStorage import MongoGridFs
 from resilience.twisted.server.status import Status
+from netaddr import IPAddress
 log.startLogging(sys.stdout)
 
 class RootResource(Resource):
@@ -173,6 +174,7 @@ class searchHandler(Resource):
         request.setResponseCode(http.NOT_FOUND)
         return """
             <html><body>use post method for direct search or form below:<br><br>
+            make a search query using the lucen query language: http://lucene.apache.org/core/2_9_4/queryparsersyntax.html<br><br>
             <form action='/search' method=POST>
             Admin    : <input type='text' name='user'><br>
             Password : <input type='password' name='password'><br>
@@ -380,6 +382,8 @@ class LogCollectHandler(Resource):
             return ""
         key = postpath[0]
         ip = request.getClientIP()
+        if not ip:
+            ip = request.getClient()
         print "ip",ip
         log.msg( "session: %s"% request.getSession().uid)
         #startTime = time()
@@ -449,8 +453,12 @@ class CredentialStore():
 
     def addSource(self, name, ip):
         key = self._key_generator()
-        exists = self.sources.find_one({"name": name}, {"name": 1})
-        print exists
+        exists = None
+        try:
+            exists = self.sources.find_one({"name": name}, {"name": 1})
+        except Exception, e:
+            print "Exception: ", e
+            print "Try later!"
         if not exists :
             try :
                 source = { "name" : name, "ip": ip, "key": key }
@@ -479,16 +487,27 @@ class CredentialStore():
             
 		
     def checkSource(self, key, ip):
-        source = self.sources.find_one({"key": key, "ip": ip})
-        print "check source", key
+        source = None
+        try:
+            source = self.sources.find_one({"key": key, "ip": ip})
+            print "check source",ip ,"with key ", key
+        except Exception, e:
+            print "Exception: ", e
         if source:
             print source
-            return source["name"]
+            ipStored = IPAddress( source['ip'] )
+            ipClient = IPAddress( ip )  
+            if ipClient and ipStored == ipClient:
+                return source["name"]
         return None
 	
     def checkUser(self, user, password):
         sha = SHA256.new(password)
-        exists = self.users.find_one({"user": user, "password": sha.hexdigest()})
+        exists = None
+        try:
+            exists = self.users.find_one({"user": user, "password": sha.hexdigest()})
+        except Exception, e:
+            print "Exception: ", e
         return exists is not None
 	
     def _key_generator(self):
