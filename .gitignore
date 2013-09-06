@@ -2,3 +2,5 @@
 *.pyc
 resilience/twisted/agent/database.db
 resilience/twisted/agent/database.db-journal
+.pydevproject
+.project
