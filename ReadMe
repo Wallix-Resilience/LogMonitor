@@ -1,21 +1,21 @@
-LOG COLLECTION FOR THE CLOUD
+LOG COLLECTOR FOR CLOUD
 ============================
 
 Infos:
 ------
 Author: Lahoucine BENLAHMR
-Contact: lbenlahmr@wallix.com
+Contact: lbe@wallix.com
 Company: Wallix
 
 
 Description:
 ------------
-this software is a distributed and fault tolerant log collection for Cloud
+this software is a distributed and fault tolerant log collector for Cloud
 
 requirements:
 ------------
 
-- Apache Solr
+- Apache SolrCloud
 - Apache Zookeeper
 - Mongodb
 
