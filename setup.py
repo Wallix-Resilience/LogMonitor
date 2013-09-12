@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
 
+data = glob.glob('resilience/conffiles/*')
+
 setup(name='ResilientLog',
       version='1.0',
       description='A light logbox for the cloud',
@@ -17,6 +19,7 @@ setup(name='ResilientLog',
                   'resilience.bootstrap',
                   'resilience.data'],      
       package_data={'resilience': ['conffiles/*']},
+      data_files=[('share/logmonitor/solrconf', data)],
       requires=['pylogsparser','solrpy','mysolr','pymongo'],
       entry_points = {        
         'console_scripts': [
