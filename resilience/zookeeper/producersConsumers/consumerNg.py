@@ -90,10 +90,10 @@ class LogConsumer():
                 log.msg('WARNING unable to suppress %s due to : %s' % (item.data, e))
                 
             d = self.zcrq.get()
-            d.addCallback(_consuming)
+            d.addCallback(_consumItem)
             
         d = self.zcrq.get()
-        d.addCallback(_consuming)
+        d.addCallback(_consumItem)
         
     def _check_consumed(self):
         """
