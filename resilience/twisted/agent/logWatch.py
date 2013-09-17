@@ -25,7 +25,8 @@ class LogWatcher(object):
         try:
             self.connection.cursor().execute('CREATE TABLE files (fid TEXT PRIMARY KEY, position INTEGER)')
         except Exception as err:
-            print('issue while creating database: %s' % err)
+            pass
+            #print('issue while creating database: %s' % err)
         self.update_files()
 
         

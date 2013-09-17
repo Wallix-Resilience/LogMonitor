@@ -19,7 +19,7 @@ class logAgent():
     """
     This class represent an example of an HTTPS agent 
     """
-    def __init__(self, directory, server, key):
+    def __init__(self, directory, server, key, extentions):
         """
         Initialization of a log Collection agent
         
@@ -31,7 +31,9 @@ class logAgent():
         """
         self.server = urljoin('https://%s' % server, 'send/%s' % key)
         self.http = httplib2.Http(disable_ssl_certificate_validation=True)
-        self.lw = LogWatcher(directory,self.sendLine)
+        if extentions:
+			extentions = ['' if x=='noext' else x for x in extentions]
+        self.lw = LogWatcher(directory,self.sendLine, extentions)
         signal.signal(signal.SIGTERM, self._exitHandler)
         self.exit = False
     
@@ -91,12 +93,13 @@ def main():
     parser = argparse.ArgumentParser(description='An https log agent collector')
     parser.add_argument('-s','--server',help='address of the collect server', required=True)
     parser.add_argument('-d','--dir',help='directory to watch', required=True)
+    parser.add_argument('-e','--ext',help='extentions of files to watch', nargs='+', required=False)
     args = parser.parse_args(params) 
     serverAddr = args.server
     dirToWatch = args.dir
+    extentions = args.ext
     key = getpass.getpass("Enter your Key: ")
-    print key
-    logA = logAgent(dirToWatch, serverAddr, key)
+    logA = logAgent(dirToWatch, serverAddr, key, extentions)
     logA.run()
     
     
