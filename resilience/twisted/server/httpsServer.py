@@ -174,7 +174,18 @@ class searchHandler(Resource):
         request.setResponseCode(http.NOT_FOUND)
         return """
             <html><body>use post method for direct search or form below:<br><br>
-            make a search query using the lucen query language: http://lucene.apache.org/core/2_9_4/queryparsersyntax.html<br><br>
+            To make a search query you have to use the lucen query language: http://lucene.apache.org/core/2_9_4/queryparsersyntax.html<br>
+the seach engine is tag based. All indexed logs contains the following tags:<br><br>                                                
+date: issue date of the log, expressed in the UTC time<br>
+received_at: date the log was received by the WAB Report Manager, expressed in UTC time<br>
+source: network address or host name of the machine that issued the log<br>
+raw: the complete, raw log line<br>
+body: the message describing the event for which notification was given<br>
+program: may appear if a piece of information regarding the program issuing the log was detected<br>
+uuid: unique identifier associated with the log line<br><br>
+
+for more possible tags please refer to normalizers descriptions https://github.com/wallix/pylogsparser/tree/master/normalizers.<br>
+to make a full text search use the tag body. example:<br> body:linux<br><br>
             <form action='/search' method=POST>
             Admin    : <input type='text' name='user'><br>
             Password : <input type='password' name='password'><br>

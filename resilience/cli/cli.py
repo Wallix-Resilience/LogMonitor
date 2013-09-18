@@ -180,8 +180,10 @@ def removeLogs(args):
 
 
 def main():
+    import textwrap
     params = sys.argv[1:]
-    parser = argparse.ArgumentParser(description='LogMonitor configuration client')
+    parser = argparse.ArgumentParser(description='LogMonitor configuration client',
+                                     formatter_class=argparse.RawTextHelpFormatter)
     
     parser.add_argument('-s','--server',help='address of the producer/collector server', 
                                           default="localhost:8991")
@@ -201,7 +203,20 @@ def main():
     parserRmSource.set_defaults(func=removeSource)
     
     #create the parser for the 'search' command
-    parserSearch = subparsers.add_parser('search', help='make a search query using the lucen query language: http://lucene.apache.org/core/2_9_4/queryparsersyntax.html')
+    parserSearch = subparsers.add_parser('search', help='make a search query using the lucen query language: http://lucene.apache.org/core/2_9_4/queryparsersyntax.html\n',
+                                                description='''To make a search query you have to use the lucen query language: http://lucene.apache.org/core/2_9_4/queryparsersyntax.html
+the seach engine is tag based. All indexed logs contains the following tags.                                                
+date: issue date of the log, expressed in the UTC time
+received_at: date the log was received by the WAB Report Manager, expressed in UTC time
+source: network address or host name of the machine that issued the log
+raw: the complete, raw log line
+body: the message describing the event for which notification was given
+program: may appear if a piece of information regarding the program issuing the log was detected
+uuid: unique identifier associated with the log line
+
+for more possible tags please refer to normalizers descriptions https://github.com/wallix/pylogsparser/tree/master/normalizers.
+to make a full text search use the tag body. example: %(prog)s body:linux''',
+                                               formatter_class=argparse.RawDescriptionHelpFormatter)
     parserSearch.add_argument('query')
     parserSearch.add_argument('-r', '--rows', required=False)
     parserSearch.set_defaults(func=search)
