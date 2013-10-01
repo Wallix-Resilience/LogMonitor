@@ -20,6 +20,7 @@ setup(name='ResilientLog',
                   'resilience.bootstrap',
                   'resilience.data'],      
       package_data={'resilience': ['conffiles/*']},
+      test_suite="resilience.tests.egg_test_runner",
       data_files=[('share/logmonitor/solrconf', data)],
       requires=['pylogsparser','solrpy','mysolr','pymongo'],
       entry_points = {        

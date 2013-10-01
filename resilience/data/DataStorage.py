@@ -68,8 +68,10 @@ class MongoGridFs(object):
         
         
     def finalizeFile(self, fileDescriptor, filePath, linesAmount):
-        fileId = fileDescriptor._id
+        fileId = None
+        #import pdb; pdb.set_trace()
         try:
+            fileId = fileDescriptor._id
             self.db.fs.files.update({'_id':fileId},{"$set":{"lines":linesAmount, "remLines":linesAmount, "position":0}})
         except:
             return (None, Status.UNAVAILABLE)

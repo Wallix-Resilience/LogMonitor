@@ -144,7 +144,6 @@ class LogProducer():
         fileDescriptor = None
         linesAmount = None
         filePath = None
-        
         try:        
             FILE_D[name].close()
             fileDescriptor = FILE_D[name]

@@ -112,9 +112,9 @@ class LogConsumer():
         """
         self.consumed = 0
         #stop the timer if is just an initialization 
-        if stop:
+        if stop and self.timer.running:
             self.timer.stop()
-        else:
+        elif self.timer.running:
             self.timer.reset()
         self.indexer.commit()                   
         

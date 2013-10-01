@@ -11,6 +11,7 @@ from resilience.data.DataStorage import MongoGridFs
 from resilience.data.DataIndexer import SolrIndexer
 import zookeeper
 
+
 class ProducerConsumerTest(TestCase):
     
     def setUp(self):
@@ -49,12 +50,6 @@ class ProducerConsumerTest(TestCase):
             except zookeeper.ZooKeeperException, e:
                 print "Error on path", child_path, e
             
-            
-    def compare_data(self, data, item):
-        if isinstance(item, QueueItem):
-            self.assertEqual(data, item.data)
-        else:
-            self.assertEqual(data, item)
         
     @inlineCallbacks
     def open_client(self, credentials=None):
@@ -110,11 +105,11 @@ class ProducerConsumerTest(TestCase):
         queue = yield self.initQueue()
         #get storage
         self.storage = yield self.getStorage()
-       
         #connect to zookeeper
         zc = yield self.open_client()
         producer.MAX_LINE = 1
-        lproducer = yield producer.LogProducer( self.znode_path, zc, queue, self.storage)
+        lproducer = yield producer.LogProducer( self.znode_path, zc, 
+                                                  queue, self.storage)
         returnValue(lproducer)
         
     @inlineCallbacks
@@ -127,11 +122,12 @@ class ProducerConsumerTest(TestCase):
         self.indexer = yield self.getIndexer()
         #connect to zookeeper
         zc = yield self.open_client()
-        lconsumer = yield consumer.LogConsumer(self.znode_path, zc, queue, self.storage, self.indexer, self.normalizer)
+        lconsumer = yield consumer.LogConsumer(self.znode_path, zc, 
+                     queue, self.storage, self.indexer, self.normalizer)
         returnValue(lconsumer)
         
     @inlineCallbacks
-    def test_producer_put_log_in_queue(self):
+    def test_producer_put_log_in_queue_and_storage(self):
         #get an instance of producer
         lproducer = yield self.create_producer()
         #process a log line by the producer
@@ -139,7 +135,6 @@ class ProducerConsumerTest(TestCase):
         logLine = 'Sep 26 15:31:39 lahoucine-HP kernel: [188510.991597] vboxnetflt: dropped 15472 out of 24223 packets'
         yield self.sleep(0.5)
         yield lproducer.produce(logLine, source_name)
-        #yield lproducer.commit(source_name)
         #teste if we have the same log in storage after process
         #get the file path
         queue = yield self.initQueue()
@@ -172,7 +167,7 @@ class ProducerConsumerTest(TestCase):
         print indexed_log
         self.assertEqual(logLine, indexed_log)
         
-    
+    @inlineCallbacks
     def test_queue_size_before_consuming(self):
         #get an instance of producer
         lproducer = yield self.create_producer()
@@ -182,14 +177,28 @@ class ProducerConsumerTest(TestCase):
         yield self.sleep(0.5)
         yield lproducer.produce(logLine, source_name)
         queue = yield self.initQueue()
-        queue_size = yield queue.size()
+        queue_size = yield queue.qsize()
         print "sizeeeee", queue_size
-        self.assertEqual(queue_size, 2)
-    
-    def gtest_queue_size_afte_consuming(self):
-        pass
+        self.assertEqual(queue_size, 1)
         
-    def gtest_muliproducer_multiconsumer(self):
-        pass
-           
-    
+    @inlineCallbacks
+    def test_queue_size_afte_consuming(self):
+        #get an instance of consumer
+        lconsumer = yield self.create_consumer()
+        #get an instance of producer
+        lproducer = yield self.create_producer()
+        yield self.sleep(0.5)
+        #produce a log line
+        source_name = 'mach1'
+        logLine = 'Sep 26 15:31:39 lahoucine-HP kernel: [188510.991597] vboxnetflt: dropped 15472 out of 24223 packets'
+        yield lproducer.produce(logLine, source_name)
+        #consume a log line
+        yield lconsumer.consume()
+        yield self.sleep(0.5)
+        yield lconsumer._indexCommiter()
+        #test if the log was consumed and indexed
+        #wait the log to be indexed
+        yield self.sleep(0.5)
+        queue = yield self.initQueue()
+        queue_size = yield queue.qsize()
+        self.assertEqual(queue_size, 0)
